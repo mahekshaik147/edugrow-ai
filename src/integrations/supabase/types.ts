@@ -14,7 +14,135 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      achievements: {
+        Row: {
+          badge_key: string
+          description: string | null
+          earned_at: string
+          id: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          badge_key: string
+          description?: string | null
+          earned_at?: string
+          id?: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          badge_key?: string
+          description?: string | null
+          earned_at?: string
+          id?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      assessment_results: {
+        Row: {
+          category: string
+          created_at: string
+          difficulty: string
+          id: string
+          score: number
+          time_spent_sec: number
+          total_questions: number
+          user_id: string
+          xp_earned: number
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          difficulty: string
+          id?: string
+          score: number
+          time_spent_sec?: number
+          total_questions: number
+          user_id: string
+          xp_earned?: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          difficulty?: string
+          id?: string
+          score?: number
+          time_spent_sec?: number
+          total_questions?: number
+          user_id?: string
+          xp_earned?: number
+        }
+        Relationships: []
+      }
+      chat_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_emoji: string
+          coins: number
+          created_at: string
+          display_name: string
+          grade: number
+          id: string
+          last_active: string | null
+          level: number
+          streak: number
+          updated_at: string
+          xp: number
+        }
+        Insert: {
+          avatar_emoji?: string
+          coins?: number
+          created_at?: string
+          display_name?: string
+          grade?: number
+          id: string
+          last_active?: string | null
+          level?: number
+          streak?: number
+          updated_at?: string
+          xp?: number
+        }
+        Update: {
+          avatar_emoji?: string
+          coins?: number
+          created_at?: string
+          display_name?: string
+          grade?: number
+          id?: string
+          last_active?: string | null
+          level?: number
+          streak?: number
+          updated_at?: string
+          xp?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
