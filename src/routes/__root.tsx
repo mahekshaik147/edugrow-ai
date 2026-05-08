@@ -77,9 +77,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "SmartMind AI — Learn, Think, Speak Better" },
       { name: "description", content: "An AI-powered learning game for kids in Grades 1–10. Boost reasoning, memory, and confidence." },
       { property: "og:title", content: "SmartMind AI — Learn, Think, Speak Better" },
-      { property: "og:description", content: "An AI-powered learning game for kids in Grades 1–10." },
+      { property: "og:description", content: "An AI-powered learning game for kids in Grades 1–10. Boost reasoning, memory, and confidence." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "SmartMind AI — Learn, Think, Speak Better" },
+      { name: "twitter:description", content: "An AI-powered learning game for kids in Grades 1–10. Boost reasoning, memory, and confidence." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/948a47d6-c68c-4935-95fd-ef8d621fba39" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/948a47d6-c68c-4935-95fd-ef8d621fba39" },
     ],
     links: [
       {
