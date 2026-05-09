@@ -147,7 +147,7 @@ function Stats() {
 
 function Features() {
   const items = [
-    { icon: Brain, title: "Adaptive Brain Games", desc: "Memory, logic, patterns and problem-solving puzzles that adapt to your child's level.", grad: "gradient-hero" },
+    { icon: Brain, title: "Adaptive Brain IQ", desc: "Memory, logic, patterns and problem-solving IQ tests that adapt to your child's level.", grad: "gradient-hero" },
     { icon: MessageSquare, title: "AI Speaking Tutor", desc: "A friendly AI that chats, corrects gently, and builds vocabulary and confidence.", grad: "gradient-mint" },
     { icon: Trophy, title: "XP, Streaks & Badges", desc: "Daily streaks, coins, levels and unlockable rewards keep motivation high.", grad: "gradient-coin" },
     { icon: Zap, title: "Instant Feedback", desc: "Every answer comes with a kid-friendly explanation — no shame, just learning.", grad: "gradient-sunset" },
@@ -182,7 +182,7 @@ function Features() {
 function HowItWorks() {
   const steps = [
     { n: "1", title: "Pick your grade", desc: "We tune the look, words and challenges to your age.", emoji: "🎒" },
-    { n: "2", title: "Play & learn", desc: "Quick games, AI chats, and adaptive puzzles. 10 min/day is plenty.", emoji: "🎮" },
+    { n: "2", title: "Train & learn", desc: "Quick IQ tests, AI chats, and adaptive puzzles. 10 min/day is plenty.", emoji: "🧠" },
     { n: "3", title: "Watch yourself grow", desc: "Earn XP, build streaks and unlock new badges every week.", emoji: "🚀" },
   ];
   return (
