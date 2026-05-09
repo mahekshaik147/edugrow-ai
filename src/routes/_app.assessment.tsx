@@ -5,92 +5,126 @@ import confetti from "canvas-confetti";
 import { useAuth } from "@/lib/auth";
 import { useProfile, awardXP } from "@/lib/useProfile";
 import { supabase } from "@/integrations/supabase/client";
-import { pickQuestions, nextDifficulty, type Category, type Difficulty, type Question } from "@/lib/questions";
+import {
+  pickQuestions, suggestLevelForGrade, nextLevel,
+  type Category, type Level, type Question,
+} from "@/lib/questions";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Brain, Puzzle, Lightbulb, Layers, Timer, Sparkles, Check, X } from "lucide-react";
-import { toast } from "sonner";
+import { Brain, Puzzle, Lightbulb, Layers, Sparkles, Check, X, Eye, EyeOff } from "lucide-react";
 
 export const Route = createFileRoute("/_app/assessment")({
-  head: () => ({ meta: [{ title: "Brain Games — SmartMind AI" }] }),
+  head: () => ({ meta: [{ title: "IQ Zone — SmartMind AI" }] }),
   component: Assessment,
 });
 
-const CATEGORIES: { key: Category; label: string; icon: React.ReactNode; gradient: string; emoji: string }[] = [
-  { key: "Memory", label: "Memory", icon: <Brain />, gradient: "gradient-hero", emoji: "🧠" },
-  { key: "Logic", label: "Logic", icon: <Lightbulb />, gradient: "gradient-mint", emoji: "💡" },
-  { key: "Pattern", label: "Patterns", icon: <Layers />, gradient: "gradient-sunset", emoji: "🔁" },
-  { key: "Problem", label: "Problem Solving", icon: <Puzzle />, gradient: "gradient-coin", emoji: "🧩" },
+const CATEGORIES: { key: Category; label: string; tag: string; icon: React.ReactNode; gradient: string; emoji: string }[] = [
+  { key: "Memory", label: "Memory IQ", tag: "Brain memory training", icon: <Brain />, gradient: "gradient-hero", emoji: "🧠" },
+  { key: "Logic", label: "Logic IQ", tag: "IQ reasoning challenges", icon: <Lightbulb />, gradient: "gradient-mint", emoji: "💡" },
+  { key: "Pattern", label: "Pattern IQ", tag: "Visual IQ puzzles", icon: <Layers />, gradient: "gradient-sunset", emoji: "🔁" },
+  { key: "Problem", label: "Problem IQ", tag: "Interactive thinking challenges", icon: <Puzzle />, gradient: "gradient-coin", emoji: "🧩" },
 ];
 
-type Phase = "pick" | "play" | "result";
+const LEVELS: { key: Level; title: string; sub: string; emoji: string; grades: string; gradient: string }[] = [
+  { key: "easy", title: "Easy", sub: "Beginner-friendly warm-up", emoji: "🌱", grades: "Grades 1–4", gradient: "gradient-mint" },
+  { key: "medium", title: "Medium", sub: "Sharper thinking, longer paths", emoji: "⚡", grades: "Grades 5–7", gradient: "gradient-sunset" },
+  { key: "hard", title: "Hard", sub: "Real IQ challenge mode", emoji: "🔥", grades: "Grades 8–10", gradient: "gradient-hero" },
+];
+
+type Phase = "category" | "level" | "memorize" | "play" | "result";
 
 function Assessment() {
   const { user } = useAuth();
   const { profile, refresh } = useProfile();
   const grade = profile?.grade ?? 5;
 
-  const [phase, setPhase] = useState<Phase>("pick");
+  const [phase, setPhase] = useState<Phase>("category");
   const [category, setCategory] = useState<Category>("Logic");
-  const [difficulty, setDifficulty] = useState<Difficulty>("medium");
+  const [level, setLevel] = useState<Level>(suggestLevelForGrade(grade));
   const [questions, setQuestions] = useState<Question[]>([]);
   const [idx, setIdx] = useState(0);
   const [answers, setAnswers] = useState<number[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [startedAt, setStartedAt] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(30);
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [memoryTimeLeft, setMemoryTimeLeft] = useState(0);
 
-  function start(cat: Category) {
-    const qs = pickQuestions(grade, difficulty, 6).filter(q => q.category === cat).length >= 4
-      ? pickQuestions(grade, difficulty, 8).filter(q => q.category === cat).slice(0, 6)
-      : pickQuestions(grade, difficulty, 12).filter(q => q.category === cat).slice(0, 6);
-    // fallback: any category if not enough
-    const finalQs = qs.length >= 4 ? qs : pickQuestions(grade, difficulty, 6);
+  const isTimedCategory = category === "Memory" || category === "Pattern";
+
+  function pickCategory(cat: Category) {
     setCategory(cat);
-    setQuestions(finalQs);
-    setIdx(0); setAnswers([]); setSelected(null); setShowFeedback(false);
-    setStartedAt(Date.now()); setTimeLeft(30);
-    setPhase("play");
+    setPhase("level");
   }
 
-  // timer per question
-  useEffect(() => {
-    if (phase !== "play" || showFeedback) return;
-    setTimeLeft(30);
-    const id = setInterval(() => setTimeLeft(t => t - 1), 1000);
-    return () => clearInterval(id);
-  }, [phase, idx, showFeedback]);
-  useEffect(() => {
-    if (phase === "play" && timeLeft <= 0 && !showFeedback) {
-      pick(-1);
+  function startLevel(lvl: Level) {
+    const qs = pickQuestions(category, lvl, 5);
+    if (qs.length === 0) return;
+    setLevel(lvl);
+    setQuestions(qs);
+    setIdx(0); setAnswers([]); setSelected(null); setShowFeedback(false);
+    setStartedAt(Date.now());
+    if (qs[0].type.startsWith("memory")) {
+      setMemoryTimeLeft((qs[0] as any).memorizeSec);
+      setPhase("memorize");
+    } else {
+      const t = (qs[0] as any).timeSec ?? (lvl === "hard" ? 30 : lvl === "medium" ? 25 : 20);
+      setTimeLeft(t);
+      setPhase("play");
     }
-  }, [timeLeft, phase, showFeedback]);
+  }
+
+  // Memorization countdown
+  useEffect(() => {
+    if (phase !== "memorize") return;
+    if (memoryTimeLeft <= 0) {
+      const q = questions[idx] as any;
+      const t = q.timeSec ?? 25;
+      setTimeLeft(t);
+      setPhase("play");
+      return;
+    }
+    const id = setTimeout(() => setMemoryTimeLeft(t => t - 1), 1000);
+    return () => clearTimeout(id);
+  }, [phase, memoryTimeLeft, idx, questions]);
+
+  // Play timer (only if isTimedCategory)
+  useEffect(() => {
+    if (phase !== "play" || !isTimedCategory || showFeedback) return;
+    if (timeLeft <= 0) { pick(-1); return; }
+    const id = setTimeout(() => setTimeLeft(t => t - 1), 1000);
+    return () => clearTimeout(id);
+  }, [phase, timeLeft, showFeedback, isTimedCategory]);
 
   function pick(i: number) {
     if (showFeedback) return;
     setSelected(i);
     setShowFeedback(true);
-    const correct = i === questions[idx].answer;
-    if (correct) {
-      confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 }, colors: ["#a78bfa","#34d399","#fbbf24"] });
-    }
+    const correct = i === (questions[idx] as any).answer;
+    if (correct) confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 }, colors: ["#a78bfa","#34d399","#fbbf24"] });
     setAnswers(a => [...a, i]);
   }
 
   async function next() {
     if (idx + 1 < questions.length) {
-      setIdx(idx + 1); setSelected(null); setShowFeedback(false);
+      const nextIdx = idx + 1;
+      const nq = questions[nextIdx] as any;
+      setIdx(nextIdx); setSelected(null); setShowFeedback(false);
+      if (nq.type.startsWith("memory")) {
+        setMemoryTimeLeft(nq.memorizeSec);
+        setPhase("memorize");
+      } else {
+        setTimeLeft(nq.timeSec ?? (level === "hard" ? 30 : level === "medium" ? 25 : 20));
+      }
     } else {
-      // Finish
-      const score = questions.reduce((acc, q, i) => acc + (answers[i] === q.answer || (i === idx && selected === q.answer) ? 1 : 0), 0);
+      const score = answers.reduce((a, ans, i) => a + (ans === (questions[i] as any).answer ? 1 : 0), 0);
       const time = Math.round((Date.now() - startedAt) / 1000);
       const pct = (score / questions.length) * 100;
-      const xp = score * 10 + (pct === 100 ? 50 : 0);
+      const xp = score * 12 + (pct === 100 ? 60 : 0);
       const coins = score * 2;
       if (user) {
         await supabase.from("assessment_results").insert({
-          user_id: user.id, category, difficulty,
+          user_id: user.id, category, difficulty: level,
           score, total_questions: questions.length,
           time_spent_sec: time, xp_earned: xp,
         });
@@ -98,34 +132,33 @@ function Assessment() {
         if (pct === 100) {
           await supabase.from("achievements").upsert({
             user_id: user.id, badge_key: `perfect_${category.toLowerCase()}`,
-            title: `${category} Champion`, description: `Perfect score on ${category}!`,
+            title: `${category} IQ Champion`, description: `Perfect score on ${category} IQ!`,
           }, { onConflict: "user_id,badge_key" });
         }
         refresh();
       }
-      setDifficulty(nextDifficulty(pct));
+      setLevel(nextLevel(pct, level));
       setPhase("result");
       if (pct >= 80) confetti({ particleCount: 200, spread: 100, origin: { y: 0.5 } });
     }
   }
 
-  if (phase === "pick") {
+  // ---------- CATEGORY PICKER ----------
+  if (phase === "category") {
     return (
       <div className="mx-auto max-w-5xl px-4 py-10">
-        <h1 className="font-display text-4xl font-bold text-center">Pick a brain game 🎯</h1>
-        <p className="text-center text-muted-foreground mt-2">
-          Difficulty auto-tuned: <span className="font-bold capitalize text-primary">{difficulty}</span>
-        </p>
+        <h1 className="font-display text-4xl font-bold text-center">IQ Zone 🧠</h1>
+        <p className="text-center text-muted-foreground mt-2">Pick a brain training category</p>
         <div className="mt-10 grid sm:grid-cols-2 gap-5">
           {CATEGORIES.map((c, i) => (
             <motion.button key={c.key}
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
               whileHover={{ scale: 1.03, y: -4 }} whileTap={{ scale: 0.98 }}
-              onClick={() => start(c.key)}
+              onClick={() => pickCategory(c.key)}
               className={`relative overflow-hidden rounded-3xl p-8 ${c.gradient} text-primary-foreground shadow-soft hover:shadow-pop text-left`}>
               <div className="text-6xl">{c.emoji}</div>
               <h3 className="mt-4 font-display text-2xl font-bold">{c.label}</h3>
-              <p className="text-sm opacity-90 mt-1">6 questions • ~3 minutes</p>
+              <p className="text-sm opacity-90 mt-1">{c.tag}</p>
               <div className="absolute -bottom-6 -right-4 text-9xl opacity-10">{c.emoji}</div>
             </motion.button>
           ))}
@@ -134,8 +167,73 @@ function Assessment() {
     );
   }
 
+  // ---------- LEVEL PICKER ----------
+  if (phase === "level") {
+    return (
+      <div className="mx-auto max-w-5xl px-4 py-10">
+        <button onClick={() => setPhase("category")} className="text-sm font-bold text-muted-foreground hover:text-primary">← Back</button>
+        <h1 className="font-display text-4xl font-bold text-center mt-2">Choose your IQ level</h1>
+        <p className="text-center text-muted-foreground mt-2">
+          <b className="text-primary">{category} IQ</b> · suggested for you:{" "}
+          <span className="capitalize font-bold">{suggestLevelForGrade(grade)}</span>
+        </p>
+        <div className="mt-10 grid md:grid-cols-3 gap-5">
+          {LEVELS.map((l, i) => (
+            <motion.button key={l.key}
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
+              whileHover={{ scale: 1.04, y: -6 }} whileTap={{ scale: 0.98 }}
+              onClick={() => startLevel(l.key)}
+              className={`relative overflow-hidden rounded-3xl p-7 ${l.gradient} text-primary-foreground text-left shadow-soft hover:shadow-pop`}>
+              <div className="text-5xl">{l.emoji}</div>
+              <h3 className="mt-3 font-display text-3xl font-bold">{l.title}</h3>
+              <p className="text-sm opacity-90 mt-1">{l.sub}</p>
+              <div className="mt-4 text-xs uppercase font-bold opacity-90">{l.grades}</div>
+              <div className="mt-3 inline-flex px-3 py-1 rounded-full bg-white/20 text-xs font-bold backdrop-blur-sm">5 questions</div>
+            </motion.button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ---------- MEMORIZE PHASE ----------
+  if (phase === "memorize") {
+    const q = questions[idx] as any;
+    const totalSec = q.memorizeSec;
+    const pctRem = (memoryTimeLeft / totalSec) * 100;
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-10">
+        <div className="text-center text-sm font-bold text-muted-foreground uppercase tracking-wider">
+          {category} IQ · Question {idx + 1} of {questions.length}
+        </div>
+        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+          className="mt-6 glass-strong rounded-3xl p-8 text-center">
+          <div className="flex justify-center mb-6">
+            <CircularTimer value={pctRem} label={String(memoryTimeLeft)} accent="primary" />
+          </div>
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/15 text-primary text-sm font-bold">
+            <Eye className="h-4 w-4" /> Memorize these!
+          </div>
+          <div className="mt-8 flex flex-wrap justify-center gap-4">
+            {q.memorize.map((item: string, i: number) => (
+              <motion.div key={i}
+                initial={{ scale: 0, rotate: -20 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ delay: i * 0.12, type: "spring" }}
+                className="size-24 md:size-28 rounded-3xl glass grid place-items-center text-5xl md:text-6xl shadow-pop">
+                {item}
+              </motion.div>
+            ))}
+          </div>
+          <p className="mt-8 text-sm text-muted-foreground">Get ready — the question appears when the timer ends.</p>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // ---------- RESULT ----------
   if (phase === "result") {
-    const score = answers.reduce((acc, a, i) => acc + (a === questions[i].answer ? 1 : 0), 0);
+    const score = answers.reduce((a, ans, i) => a + (ans === (questions[i] as any).answer ? 1 : 0), 0);
     const pct = Math.round((score / questions.length) * 100);
     return (
       <div className="mx-auto max-w-2xl px-4 py-10">
@@ -143,26 +241,19 @@ function Assessment() {
           className="glass-strong rounded-3xl p-10 text-center">
           <div className="text-7xl">{pct === 100 ? "🏆" : pct >= 80 ? "🌟" : pct >= 50 ? "👏" : "💪"}</div>
           <h2 className="mt-4 font-display text-4xl font-bold">
-            {pct === 100 ? "Perfect!" : pct >= 80 ? "Amazing!" : pct >= 50 ? "Nice work!" : "Keep going!"}
+            {pct === 100 ? "Perfect IQ!" : pct >= 80 ? "Brilliant!" : pct >= 50 ? "Nice work!" : "Keep training!"}
           </h2>
-          <div className="mt-2 text-muted-foreground">You scored</div>
+          <div className="mt-2 text-muted-foreground">Your IQ score</div>
           <div className="mt-1 font-display text-6xl font-bold text-gradient">{pct}%</div>
-          <div className="mt-2 text-sm text-muted-foreground">{score} of {questions.length} correct</div>
+          <div className="mt-2 text-sm text-muted-foreground">{score} of {questions.length} correct · {category} · <span className="capitalize">{level}</span></div>
           <div className="mt-6 flex justify-center gap-3 text-sm">
             <span className="px-4 py-1.5 rounded-full bg-primary/15 text-primary font-bold">
-              <Sparkles className="inline h-3.5 w-3.5 mr-1" />+{score * 10 + (pct === 100 ? 50 : 0)} XP
+              <Sparkles className="inline h-3.5 w-3.5 mr-1" />+{score * 12 + (pct === 100 ? 60 : 0)} XP
             </span>
-            <span className="px-4 py-1.5 rounded-full bg-fun/40 text-fun-foreground font-bold">
-              +{score * 2} coins
-            </span>
+            <span className="px-4 py-1.5 rounded-full bg-fun/40 text-fun-foreground font-bold">+{score * 2} coins</span>
           </div>
-          <p className="mt-5 text-sm text-muted-foreground">
-            Next time we'll tune difficulty to <b className="text-primary capitalize">{difficulty}</b>
-          </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
-            <Button onClick={() => setPhase("pick")} className="rounded-full font-bold h-12 px-6">
-              Play another 🎮
-            </Button>
+            <Button onClick={() => setPhase("category")} className="rounded-full font-bold h-12 px-6">Pick another IQ test 🎯</Button>
             <Link to="/dashboard"><Button variant="outline" className="rounded-full font-bold h-12 px-6 w-full">Back to home</Button></Link>
           </div>
         </motion.div>
@@ -170,31 +261,60 @@ function Assessment() {
     );
   }
 
-  // PLAY
-  const q = questions[idx];
+  // ---------- PLAY ----------
+  const q = questions[idx] as any;
   const correct = q.answer;
+  const totalTime = q.timeSec ?? (level === "hard" ? 30 : level === "medium" ? 25 : 20);
+  const timePct = isTimedCategory ? (timeLeft / totalTime) * 100 : 0;
+  const warning = isTimedCategory && timeLeft <= 5;
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       <div className="flex items-center gap-4 mb-4">
         <div className="text-sm font-bold">{idx + 1} / {questions.length}</div>
         <Progress value={((idx + (showFeedback ? 1 : 0)) / questions.length) * 100} className="h-2 flex-1" />
-        <div className={`flex items-center gap-1.5 font-bold text-sm px-3 py-1 rounded-full ${
-          timeLeft <= 5 ? "bg-destructive/20 text-destructive" : "bg-muted"
-        }`}>
-          <Timer className="h-3.5 w-3.5" /> {Math.max(0, timeLeft)}s
-        </div>
+        {isTimedCategory ? (
+          <CircularTimer value={timePct} label={String(Math.max(0, timeLeft))} compact accent={warning ? "destructive" : "primary"} />
+        ) : (
+          <div className="text-xs uppercase font-bold text-muted-foreground tracking-wider px-3 py-1 rounded-full bg-muted">No timer</div>
+        )}
       </div>
 
       <AnimatePresence mode="wait">
         <motion.div key={q.id}
           initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}
           className="glass-strong rounded-3xl p-7 md:p-10">
-          <div className="text-xs uppercase font-bold text-muted-foreground tracking-wider">{q.category} · {q.difficulty}</div>
-          {q.emoji && <div className="text-5xl mt-3 text-center">{q.emoji}</div>}
-          <h2 className="font-display text-2xl md:text-3xl font-bold mt-4 leading-tight">{q.prompt}</h2>
+          <div className="text-xs uppercase font-bold text-muted-foreground tracking-wider">
+            {category} IQ · {level}
+          </div>
+
+          {/* Memory: show "items hidden" badge */}
+          {q.type?.startsWith("memory") && (
+            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary text-xs font-bold">
+              <EyeOff className="h-3.5 w-3.5" /> Items hidden — recall now
+            </div>
+          )}
+
+          {/* Pattern visual sequence */}
+          {q.type?.startsWith("pattern") && (
+            <div className="mt-5 flex flex-wrap justify-center gap-3">
+              {q.sequence.map((s: string, i: number) => (
+                <motion.div key={i}
+                  initial={{ scale: 0, rotate: -10 }} animate={{ scale: 1, rotate: 0 }}
+                  transition={{ delay: i * 0.08, type: "spring" }}
+                  className={`size-16 md:size-20 rounded-2xl grid place-items-center text-3xl md:text-4xl font-bold ${
+                    s === "?" ? "bg-primary/15 border-2 border-dashed border-primary text-primary" : "glass shadow-soft"
+                  }`}>
+                  {s}
+                </motion.div>
+              ))}
+            </div>
+          )}
+
+          <h2 className="font-display text-2xl md:text-3xl font-bold mt-6 leading-tight">{q.prompt}</h2>
 
           <div className="mt-6 grid sm:grid-cols-2 gap-3">
-            {q.options.map((opt, i) => {
+            {q.options.map((opt: string, i: number) => {
               const isCorrect = i === correct;
               const isSelected = i === selected;
               const showState = showFeedback;
@@ -205,11 +325,9 @@ function Assessment() {
                   onClick={() => pick(i)}
                   className={`p-4 rounded-2xl text-left font-bold border-2 transition-all ${
                     showState
-                      ? isCorrect
-                        ? "bg-success/20 border-success text-success-foreground"
-                        : isSelected
-                        ? "bg-destructive/15 border-destructive"
-                        : "bg-muted border-transparent opacity-60"
+                      ? isCorrect ? "bg-success/20 border-success text-success-foreground"
+                      : isSelected ? "bg-destructive/15 border-destructive"
+                      : "bg-muted border-transparent opacity-60"
                       : "bg-card border-border hover:border-primary hover:bg-primary/5"
                   }`}>
                   <div className="flex items-center gap-3">
@@ -240,12 +358,33 @@ function Assessment() {
           {showFeedback && (
             <div className="mt-6 flex justify-end">
               <Button onClick={next} className="rounded-full font-bold h-12 px-7">
-                {idx + 1 < questions.length ? "Next →" : "See results 🎉"}
+                {idx + 1 < questions.length ? "Next →" : "See IQ score 🎉"}
               </Button>
             </div>
           )}
         </motion.div>
       </AnimatePresence>
+    </div>
+  );
+}
+
+// ---------- Circular Timer ----------
+function CircularTimer({ value, label, compact, accent = "primary" }: { value: number; label: string; compact?: boolean; accent?: "primary" | "destructive" }) {
+  const size = compact ? 44 : 110;
+  const stroke = compact ? 4 : 8;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const offset = c - (Math.max(0, Math.min(100, value)) / 100) * c;
+  const color = accent === "destructive" ? "hsl(var(--destructive))" : "hsl(var(--primary))";
+  return (
+    <div className="relative grid place-items-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className={accent === "destructive" ? "animate-pulse" : ""}>
+        <circle cx={size/2} cy={size/2} r={r} stroke="currentColor" className="text-muted" strokeWidth={stroke} fill="none" />
+        <circle cx={size/2} cy={size/2} r={r} stroke={color} strokeWidth={stroke} fill="none"
+          strokeLinecap="round" strokeDasharray={c} strokeDashoffset={offset}
+          transform={`rotate(-90 ${size/2} ${size/2})`} style={{ transition: "stroke-dashoffset 0.9s linear" }} />
+      </svg>
+      <span className={`absolute font-display font-bold ${compact ? "text-xs" : "text-3xl"}`}>{label}{compact ? "" : "s"}</span>
     </div>
   );
 }
