@@ -66,7 +66,7 @@ function ProgressPage() {
       <h1 className="font-display text-4xl font-bold">Your progress 📈</h1>
 
       <div className="grid sm:grid-cols-3 gap-4">
-        <KPI label="Games played" value={total} emoji="🎮" />
+        <KPI label="IQ tests taken" value={total} emoji="🧠" />
         <KPI label="Average accuracy" value={`${accuracy}%`} emoji="🎯" />
         <KPI label="Total XP" value={totalXP} emoji="✨" />
       </div>
@@ -113,7 +113,7 @@ function ProgressPage() {
                 <YAxis />
                 <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid var(--border)" }} />
                 <Bar dataKey="avg" fill="var(--primary)" radius={[12, 12, 0, 0]} name="Avg %" />
-                <Bar dataKey="games" fill="var(--accent)" radius={[12, 12, 0, 0]} name="Games" />
+                <Bar dataKey="games" fill="var(--accent)" radius={[12, 12, 0, 0]} name="IQ tests" />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -127,7 +127,7 @@ function ProgressPage() {
                 <span className="font-bold">{s.category}</span>
                 <span className="font-bold text-success-foreground">{s.score}%</span>
               </div>
-            )) : <div className="mt-2 text-sm text-muted-foreground">Play some games to see your strengths!</div>}
+            )) : <div className="mt-2 text-sm text-muted-foreground">Take some IQ tests to see your strengths!</div>}
           </div>
           <div>
             <div className="text-xs uppercase font-bold text-muted-foreground">Areas to grow 🌱</div>

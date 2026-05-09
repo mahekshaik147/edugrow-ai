@@ -73,7 +73,7 @@ function Dashboard() {
       {/* Quick actions */}
       <div className="mt-6 grid md:grid-cols-3 gap-4">
         <ActionCard to="/assessment" gradient="gradient-hero" icon={<Brain className="h-7 w-7" />}
-          title="Brain Games" desc="Adaptive puzzles tuned for you" cta="Play now" />
+          title="IQ Zone" desc="Memory, logic, patterns & problem-solving IQ tests" cta="Start IQ test" />
         <ActionCard to="/chat" gradient="gradient-mint" icon={<MessageSquare className="h-7 w-7" />}
           title="AI Tutor" desc="Chat, learn, get instant feedback" cta="Start chat" />
         <ActionCard to="/rewards" gradient="gradient-sunset" icon={<Trophy className="h-7 w-7" />}
@@ -111,7 +111,7 @@ function Dashboard() {
         {!recent || recent.length === 0 ? (
           <div className="text-center py-10 text-muted-foreground">
             <Target className="h-10 w-10 mx-auto mb-2 opacity-50" />
-            No activity yet — play your first game!
+            No activity yet — try your first IQ test!
           </div>
         ) : (
           <ul className="divide-y divide-border">

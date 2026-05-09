@@ -12,7 +12,7 @@ export const Route = createFileRoute("/_app/rewards")({
 });
 
 const ALL_BADGES = [
-  { key: "first_game", title: "First Steps", desc: "Played your first game", emoji: "👶" },
+  { key: "first_game", title: "First Steps", desc: "Completed your first IQ test", emoji: "👶" },
   { key: "perfect_logic", title: "Logic Champion", desc: "Perfect score on Logic", emoji: "💡" },
   { key: "perfect_memory", title: "Memory Master", desc: "Perfect score on Memory", emoji: "🧠" },
   { key: "perfect_pattern", title: "Pattern Pro", desc: "Perfect score on Patterns", emoji: "🔁" },
