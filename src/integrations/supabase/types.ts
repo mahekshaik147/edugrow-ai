@@ -143,6 +143,69 @@ export type Database = {
         }
         Relationships: []
       }
+      question_history: {
+        Row: {
+          category: string
+          created_at: string
+          difficulty: string
+          id: string
+          question_id: string
+          time_spent_sec: number
+          user_id: string
+          was_correct: boolean
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          difficulty: string
+          id?: string
+          question_id: string
+          time_spent_sec?: number
+          user_id: string
+          was_correct?: boolean
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          difficulty?: string
+          id?: string
+          question_id?: string
+          time_spent_sec?: number
+          user_id?: string
+          was_correct?: boolean
+        }
+        Relationships: []
+      }
+      study_plans: {
+        Row: {
+          created_at: string
+          id: string
+          plan: Json
+          recommendations: Json
+          updated_at: string
+          user_id: string
+          weaknesses: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          plan: Json
+          recommendations?: Json
+          updated_at?: string
+          user_id: string
+          weaknesses?: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          plan?: Json
+          recommendations?: Json
+          updated_at?: string
+          user_id?: string
+          weaknesses?: Json
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

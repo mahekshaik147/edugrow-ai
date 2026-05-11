@@ -6,12 +6,13 @@ import { useAuth } from "@/lib/auth";
 import { useProfile, awardXP } from "@/lib/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  pickQuestions, suggestLevelForGrade, nextLevel,
+  pickUnseenQuestions, suggestLevelForGrade, nextLevel,
   type Category, type Level, type Question,
 } from "@/lib/questions";
+import { analyzeSession, type SessionAnalysis } from "@/lib/analysis";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Brain, Puzzle, Lightbulb, Layers, Sparkles, Check, X, Eye, EyeOff, BookOpen } from "lucide-react";
+import { Brain, Puzzle, Lightbulb, Layers, Sparkles, Check, X, Eye, EyeOff, BookOpen, Clock, Target, TrendingUp, Lightbulb as Bulb } from "lucide-react";
 
 export const Route = createFileRoute("/_app/assessment")({
   head: () => ({ meta: [{ title: "IQ Zone — SmartMind AI" }] }),
@@ -57,12 +58,27 @@ function Assessment() {
     setPhase("level");
   }
 
-  function startLevel(lvl: Level) {
-    const qs = pickQuestions(category, lvl, 5);
+  const [analysis, setAnalysis] = useState<SessionAnalysis | null>(null);
+  const [loadingQs, setLoadingQs] = useState(false);
+
+  async function startLevel(lvl: Level) {
+    if (!user) return;
+    setLoadingQs(true);
+    // Fetch this user's already-attempted question ids for this cat+level
+    const { data: hist } = await supabase
+      .from("question_history")
+      .select("question_id")
+      .eq("user_id", user.id)
+      .eq("category", category)
+      .eq("difficulty", lvl);
+    const attemptedIds = (hist ?? []).map((h: any) => h.question_id);
+    const qs = pickUnseenQuestions(category, lvl, attemptedIds, 5);
+    setLoadingQs(false);
     if (qs.length === 0) return;
     setLevel(lvl);
     setQuestions(qs);
     setIdx(0); setAnswers([]); setSelected(null); setShowFeedback(false);
+    setAnalysis(null);
     setStartedAt(Date.now());
     if (qs[0].type.startsWith("memory")) {
       setMemoryTimeLeft((qs[0] as any).memorizeSec);
@@ -117,7 +133,9 @@ function Assessment() {
         setTimeLeft(nq.timeSec ?? (level === "hard" ? 30 : level === "medium" ? 25 : 20));
       }
     } else {
-      const score = answers.reduce((a, ans, i) => a + (ans === (questions[i] as any).answer ? 1 : 0), 0);
+      const finalAnswers = answers;
+      const perCorrect = finalAnswers.map((ans, i) => ans === (questions[i] as any).answer);
+      const score = perCorrect.filter(Boolean).length;
       const time = Math.round((Date.now() - startedAt) / 1000);
       const pct = (score / questions.length) * 100;
       const xp = score * 12 + (pct === 100 ? 60 : 0);
@@ -128,6 +146,17 @@ function Assessment() {
           score, total_questions: questions.length,
           time_spent_sec: time, xp_earned: xp,
         });
+        // Track every question this user has now seen — prevents repeats next time.
+        const avgPer = time / questions.length;
+        const historyRows = questions.map((q, i) => ({
+          user_id: user.id,
+          question_id: q.id,
+          category,
+          difficulty: level,
+          was_correct: perCorrect[i],
+          time_spent_sec: Math.round(avgPer),
+        }));
+        await supabase.from("question_history").insert(historyRows);
         await awardXP(user.id, xp, coins);
         if (pct === 100) {
           await supabase.from("achievements").upsert({
@@ -137,6 +166,12 @@ function Assessment() {
         }
         refresh();
       }
+      setAnalysis(analyzeSession({
+        category, level,
+        correct: score, total: questions.length, timeSec: time,
+        questionTypes: questions.map(q => q.type),
+        perQuestionCorrect: perCorrect,
+      }));
       setLevel(nextLevel(pct, level));
       setPhase("result");
       if (pct >= 80) confetti({ particleCount: 200, spread: 100, origin: { y: 0.5 } });
@@ -238,32 +273,112 @@ function Assessment() {
     );
   }
 
-  // ---------- RESULT ----------
-  if (phase === "result") {
-    const score = answers.reduce((a, ans, i) => a + (ans === (questions[i] as any).answer ? 1 : 0), 0);
-    const pct = Math.round((score / questions.length) * 100);
+  // ---------- RESULT — full performance analysis ----------
+  if (phase === "result" && analysis) {
+    const a = analysis;
+    const pct = a.scorePct;
     return (
-      <div className="mx-auto max-w-2xl px-4 py-10">
-        <motion.div initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-          className="glass-strong rounded-3xl p-10 text-center">
-          <div className="text-7xl">{pct === 100 ? "🏆" : pct >= 80 ? "🌟" : pct >= 50 ? "👏" : "💪"}</div>
-          <h2 className="mt-4 font-display text-4xl font-bold">
+      <div className="mx-auto max-w-3xl px-4 py-8 space-y-5">
+        <motion.div initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+          className="glass-strong rounded-3xl p-8 text-center">
+          <div className="text-6xl">{pct === 100 ? "🏆" : pct >= 80 ? "🌟" : pct >= 50 ? "👏" : "💪"}</div>
+          <h2 className="mt-3 font-display text-3xl sm:text-4xl font-bold">
             {pct === 100 ? "Perfect IQ!" : pct >= 80 ? "Brilliant!" : pct >= 50 ? "Nice work!" : "Keep training!"}
           </h2>
-          <div className="mt-2 text-muted-foreground">Your IQ score</div>
-          <div className="mt-1 font-display text-6xl font-bold text-gradient">{pct}%</div>
-          <div className="mt-2 text-sm text-muted-foreground">{score} of {questions.length} correct · {category} · <span className="capitalize">{level}</span></div>
-          <div className="mt-6 flex justify-center gap-3 text-sm">
-            <span className="px-4 py-1.5 rounded-full bg-primary/15 text-primary font-bold">
-              <Sparkles className="inline h-3.5 w-3.5 mr-1" />+{score * 12 + (pct === 100 ? 60 : 0)} XP
-            </span>
-            <span className="px-4 py-1.5 rounded-full bg-fun/40 text-fun-foreground font-bold">+{score * 2} coins</span>
+          <div className="mt-1 text-sm text-muted-foreground">{category} IQ · <span className="capitalize">{level}</span></div>
+          <div className="mt-3 font-display text-6xl font-bold text-gradient">{pct}%</div>
+          <div className="mt-2 inline-flex px-3 py-1 rounded-full bg-primary/15 text-primary text-xs font-bold uppercase tracking-wider">
+            IQ band · {a.iqBand}
           </div>
-          <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
-            <Button onClick={() => setPhase("category")} className="rounded-full font-bold h-12 px-6">Pick another IQ test 🎯</Button>
-            <Link to="/dashboard"><Button variant="outline" className="rounded-full font-bold h-12 px-6 w-full">Back to home</Button></Link>
+          <div className="mt-5 flex justify-center gap-2 text-sm">
+            <span className="px-4 py-1.5 rounded-full bg-primary/15 text-primary font-bold">
+              <Sparkles className="inline h-3.5 w-3.5 mr-1" />+{a.correct * 12 + (pct === 100 ? 60 : 0)} XP
+            </span>
+            <span className="px-4 py-1.5 rounded-full bg-fun/40 text-fun-foreground font-bold">+{a.correct * 2} coins</span>
           </div>
         </motion.div>
+
+        {/* KPI tiles */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <KpiTile icon={<Target className="h-4 w-4" />} label="Accuracy" value={`${pct}%`} />
+          <KpiTile icon={<Check className="h-4 w-4" />} label="Correct" value={`${a.correct}/${a.total}`} />
+          <KpiTile icon={<Clock className="h-4 w-4" />} label="Total time" value={`${a.timeSec}s`} />
+          <KpiTile icon={<TrendingUp className="h-4 w-4" />} label="Speed" value={a.speedRating} />
+        </div>
+
+        {/* Per-question breakdown */}
+        <div className="glass rounded-3xl p-5">
+          <h3 className="font-display text-lg font-bold mb-3">Question breakdown</h3>
+          <div className="flex flex-wrap gap-2">
+            {questions.map((q, i) => {
+              const ok = answers[i] === (q as any).answer;
+              return (
+                <div key={q.id}
+                  className={`size-9 rounded-xl grid place-items-center text-xs font-bold ${
+                    ok ? "bg-success/20 text-success-foreground border-2 border-success" : "bg-destructive/15 text-destructive border-2 border-destructive/40"
+                  }`}>
+                  {ok ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-3 text-xs text-muted-foreground">
+            Avg <b className="text-foreground">{a.avgPerQ}s</b> per question · {a.speedRating.toLowerCase()} pace
+          </div>
+        </div>
+
+        {/* Strengths / weaknesses */}
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div className="glass rounded-3xl p-5">
+            <div className="text-xs uppercase font-bold text-success-foreground tracking-wider mb-2">Strengths 💪</div>
+            {a.strengths.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No clear strengths yet — keep playing!</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {a.strengths.map(s => (
+                  <li key={s} className="px-3 py-2 rounded-xl bg-success/15 text-sm font-bold">{s}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="glass rounded-3xl p-5">
+            <div className="text-xs uppercase font-bold text-warning-foreground tracking-wider mb-2">Areas to grow 🌱</div>
+            {a.weakAreas.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Solid run — no weak spots detected!</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {a.weakAreas.map(s => (
+                  <li key={s} className="px-3 py-2 rounded-xl bg-warning/15 text-sm font-bold">{s}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        {/* AI recommendations */}
+        <div className="glass-strong rounded-3xl p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="size-9 rounded-xl gradient-hero grid place-items-center text-primary-foreground"><Bulb className="h-4 w-4" /></div>
+            <div>
+              <div className="font-display text-lg font-bold">AI Coach Recommendations</div>
+              <div className="text-xs text-muted-foreground">Personalized for your {category} performance</div>
+            </div>
+          </div>
+          <ul className="space-y-2">
+            {a.tips.map((t, i) => (
+              <li key={i} className="flex gap-3 px-3 py-2.5 rounded-2xl bg-primary/5 border border-primary/10">
+                <span className="text-lg">💡</span>
+                <span className="text-sm">{t}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Button onClick={() => setPhase("category")} className="rounded-full font-bold h-12 px-6">Try another IQ test 🎯</Button>
+          <Link to="/progress"><Button variant="outline" className="rounded-full font-bold h-12 px-6 w-full">View full progress 📈</Button></Link>
+          <Link to="/dashboard"><Button variant="ghost" className="rounded-full font-bold h-12 px-6 w-full">Home</Button></Link>
+        </div>
       </div>
     );
   }
@@ -565,6 +680,18 @@ function CircularTimer({ value, label, compact, accent = "primary" }: { value: n
           transform={`rotate(-90 ${size/2} ${size/2})`} style={{ transition: "stroke-dashoffset 0.9s linear" }} />
       </svg>
       <span className={`absolute font-display font-bold ${compact ? "text-xs" : "text-3xl"}`}>{label}{compact ? "" : "s"}</span>
+    </div>
+  );
+}
+
+// ---------- KPI tile for result page ----------
+function KpiTile({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="glass rounded-2xl p-3 text-center">
+      <div className="flex items-center justify-center gap-1.5 text-muted-foreground text-xs uppercase font-bold tracking-wider">
+        {icon} {label}
+      </div>
+      <div className="font-display text-xl font-bold mt-1">{value}</div>
     </div>
   );
 }
