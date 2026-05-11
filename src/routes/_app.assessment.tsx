@@ -133,7 +133,9 @@ function Assessment() {
         setTimeLeft(nq.timeSec ?? (level === "hard" ? 30 : level === "medium" ? 25 : 20));
       }
     } else {
-      const score = answers.reduce((a, ans, i) => a + (ans === (questions[i] as any).answer ? 1 : 0), 0);
+      const finalAnswers = answers;
+      const perCorrect = finalAnswers.map((ans, i) => ans === (questions[i] as any).answer);
+      const score = perCorrect.filter(Boolean).length;
       const time = Math.round((Date.now() - startedAt) / 1000);
       const pct = (score / questions.length) * 100;
       const xp = score * 12 + (pct === 100 ? 60 : 0);
@@ -144,6 +146,17 @@ function Assessment() {
           score, total_questions: questions.length,
           time_spent_sec: time, xp_earned: xp,
         });
+        // Track every question this user has now seen — prevents repeats next time.
+        const avgPer = time / questions.length;
+        const historyRows = questions.map((q, i) => ({
+          user_id: user.id,
+          question_id: q.id,
+          category,
+          difficulty: level,
+          was_correct: perCorrect[i],
+          time_spent_sec: Math.round(avgPer),
+        }));
+        await supabase.from("question_history").insert(historyRows);
         await awardXP(user.id, xp, coins);
         if (pct === 100) {
           await supabase.from("achievements").upsert({
@@ -153,6 +166,12 @@ function Assessment() {
         }
         refresh();
       }
+      setAnalysis(analyzeSession({
+        category, level,
+        correct: score, total: questions.length, timeSec: time,
+        questionTypes: questions.map(q => q.type),
+        perQuestionCorrect: perCorrect,
+      }));
       setLevel(nextLevel(pct, level));
       setPhase("result");
       if (pct >= 80) confetti({ particleCount: 200, spread: 100, origin: { y: 0.5 } });
