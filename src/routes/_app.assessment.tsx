@@ -6,12 +6,13 @@ import { useAuth } from "@/lib/auth";
 import { useProfile, awardXP } from "@/lib/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  pickQuestions, suggestLevelForGrade, nextLevel,
+  pickUnseenQuestions, suggestLevelForGrade, nextLevel,
   type Category, type Level, type Question,
 } from "@/lib/questions";
+import { analyzeSession, type SessionAnalysis } from "@/lib/analysis";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Brain, Puzzle, Lightbulb, Layers, Sparkles, Check, X, Eye, EyeOff, BookOpen } from "lucide-react";
+import { Brain, Puzzle, Lightbulb, Layers, Sparkles, Check, X, Eye, EyeOff, BookOpen, Clock, Target, TrendingUp, Lightbulb as Bulb } from "lucide-react";
 
 export const Route = createFileRoute("/_app/assessment")({
   head: () => ({ meta: [{ title: "IQ Zone — SmartMind AI" }] }),
