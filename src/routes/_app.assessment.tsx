@@ -58,12 +58,27 @@ function Assessment() {
     setPhase("level");
   }
 
-  function startLevel(lvl: Level) {
-    const qs = pickQuestions(category, lvl, 5);
+  const [analysis, setAnalysis] = useState<SessionAnalysis | null>(null);
+  const [loadingQs, setLoadingQs] = useState(false);
+
+  async function startLevel(lvl: Level) {
+    if (!user) return;
+    setLoadingQs(true);
+    // Fetch this user's already-attempted question ids for this cat+level
+    const { data: hist } = await supabase
+      .from("question_history")
+      .select("question_id")
+      .eq("user_id", user.id)
+      .eq("category", category)
+      .eq("difficulty", lvl);
+    const attemptedIds = (hist ?? []).map((h: any) => h.question_id);
+    const qs = pickUnseenQuestions(category, lvl, attemptedIds, 5);
+    setLoadingQs(false);
     if (qs.length === 0) return;
     setLevel(lvl);
     setQuestions(qs);
     setIdx(0); setAnswers([]); setSelected(null); setShowFeedback(false);
+    setAnalysis(null);
     setStartedAt(Date.now());
     if (qs[0].type.startsWith("memory")) {
       setMemoryTimeLeft((qs[0] as any).memorizeSec);
