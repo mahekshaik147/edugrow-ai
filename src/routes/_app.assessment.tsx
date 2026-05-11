@@ -683,3 +683,15 @@ function CircularTimer({ value, label, compact, accent = "primary" }: { value: n
     </div>
   );
 }
+
+// ---------- KPI tile for result page ----------
+function KpiTile({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="glass rounded-2xl p-3 text-center">
+      <div className="flex items-center justify-center gap-1.5 text-muted-foreground text-xs uppercase font-bold tracking-wider">
+        {icon} {label}
+      </div>
+      <div className="font-display text-xl font-bold mt-1">{value}</div>
+    </div>
+  );
+}
