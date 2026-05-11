@@ -4,9 +4,13 @@ import { useAuth } from "@/lib/auth";
 import { useProfile } from "@/lib/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import {
+  statsByCategory, detectWeaknesses, detectStrengths, recommendationsFor, generateStudyPlan,
+} from "@/lib/analysis";
+import {
   ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
   BarChart, Bar, XAxis, YAxis, Tooltip, LineChart, Line, CartesianGrid,
 } from "recharts";
+import { Lightbulb, CalendarDays, TrendingDown, Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/_app/progress")({
   head: () => ({ meta: [{ title: "Progress — SmartMind AI" }] }),
