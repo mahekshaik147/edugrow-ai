@@ -463,6 +463,31 @@ export function pickQuestions(category: Category, level: Level, count = 5): Ques
   return [...pool].sort(() => Math.random() - 0.5).slice(0, Math.min(count, pool.length));
 }
 
+/**
+ * Smart non-repeating picker.
+ * - Filters out questions the user already saw (by id).
+ * - If the unseen pool is too small, top up with the LEAST-recently-seen ones.
+ * - Always shuffles, so two users (and two retakes) get different orderings.
+ */
+export function pickUnseenQuestions(
+  category: Category,
+  level: Level,
+  attemptedIds: string[],
+  count = 5,
+): Question[] {
+  const pool = BANK.filter(q => q.category === category && q.level === level);
+  const seen = new Set(attemptedIds);
+  const unseen = pool.filter(q => !seen.has(q.id));
+  const seenAgain = pool.filter(q => seen.has(q.id));
+  const shuffle = <T,>(a: T[]) => [...a].sort(() => Math.random() - 0.5);
+
+  const picked = shuffle(unseen).slice(0, count);
+  if (picked.length < count) {
+    picked.push(...shuffle(seenAgain).slice(0, count - picked.length));
+  }
+  return picked;
+}
+
 export function suggestLevelForGrade(grade: number): Level {
   if (grade <= 4) return "easy";
   if (grade <= 7) return "medium";
