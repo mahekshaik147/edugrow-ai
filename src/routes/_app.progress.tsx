@@ -144,9 +144,117 @@ function ProgressPage() {
           </div>
         </div>
       </div>
+
+      {/* AI WEAKNESS + RECOMMENDATIONS */}
+      <WeaknessPanel results={results} />
+
+      {/* PERSONALIZED STUDY PLAN */}
+      <StudyPlanPanel results={results} />
     </div>
   );
 }
+
+function WeaknessPanel({ results }: { results: any[] }) {
+  const stats = statsByCategory(results);
+  const weak = detectWeaknesses(stats);
+  const strong = detectStrengths(stats);
+
+  return (
+    <div className="glass-strong rounded-3xl p-6">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="size-11 rounded-2xl gradient-hero grid place-items-center text-primary-foreground"><Lightbulb className="h-5 w-5" /></div>
+        <div>
+          <h3 className="font-display text-xl font-bold">AI Cognitive Coach</h3>
+          <p className="text-xs text-muted-foreground">Personalized weakness analysis & improvement plan</p>
+        </div>
+      </div>
+
+      {results.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Take a few IQ tests and your AI coach will analyze your strengths and weaknesses here.</p>
+      ) : (
+        <div className="grid md:grid-cols-2 gap-4">
+          <div>
+            <div className="text-xs uppercase font-bold tracking-wider text-warning-foreground mb-2 flex items-center gap-1.5">
+              <TrendingDown className="h-3.5 w-3.5" /> Weak areas
+            </div>
+            {weak.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No weak areas detected — keep it up!</p>
+            ) : (
+              <div className="space-y-3">
+                {weak.map(w => (
+                  <div key={w.category} className="rounded-2xl border border-warning/40 bg-warning/10 p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold">{w.category} IQ</span>
+                      <span className="text-sm font-bold">{w.accuracy}% accuracy</span>
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">{w.attempts} tests · avg {w.avgTimePerQ}s per question</div>
+                    <ul className="mt-2 space-y-1.5">
+                      {recommendationsFor(w.category).slice(0, 2).map((tip, i) => (
+                        <li key={i} className="flex gap-2 text-sm"><span>💡</span><span>{tip}</span></li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div>
+            <div className="text-xs uppercase font-bold tracking-wider text-success-foreground mb-2 flex items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5" /> Strong areas
+            </div>
+            {strong.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Keep playing to unlock strengths!</p>
+            ) : (
+              <div className="space-y-3">
+                {strong.map(s => (
+                  <div key={s.category} className="rounded-2xl border border-success/40 bg-success/10 p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold">{s.category} IQ</span>
+                      <span className="text-sm font-bold">{s.accuracy}% accuracy</span>
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">{s.attempts} tests · last score {s.lastScore}%</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StudyPlanPanel({ results }: { results: any[] }) {
+  const stats = statsByCategory(results);
+  const plan = generateStudyPlan(stats);
+  return (
+    <div className="glass rounded-3xl p-6">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="size-11 rounded-2xl gradient-mint grid place-items-center text-primary-foreground"><CalendarDays className="h-5 w-5" /></div>
+        <div>
+          <h3 className="font-display text-xl font-bold">Your weekly study plan</h3>
+          <p className="text-xs text-muted-foreground">AI-generated, adapted to your latest performance</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+        {plan.map(day => (
+          <div key={day.day} className="rounded-2xl bg-card border border-border p-3 flex flex-col">
+            <div className="text-xs uppercase font-bold tracking-wider text-muted-foreground">{day.day}</div>
+            <div className="text-2xl mt-1">{day.emoji}</div>
+            <div className="font-bold text-sm">{day.focus} IQ</div>
+            <div className="text-[11px] text-muted-foreground">{day.minutes} min focus</div>
+            <ul className="mt-2 text-[11px] space-y-1 flex-1">
+              {day.tasks.map((t, i) => (
+                <li key={i} className="flex gap-1.5"><span className="text-primary">▸</span><span>{t}</span></li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 
 function KPI({ label, value, emoji }: { label: string; value: number | string; emoji: string }) {
   return (
