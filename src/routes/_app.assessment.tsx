@@ -64,15 +64,15 @@ function Assessment() {
   async function startLevel(lvl: Level) {
     if (!user) return;
     setLoadingQs(true);
-    // Fetch this user's already-attempted question ids for this cat+level
+    // Fetch this user's question history for this category+level so we can avoid recent repeats.
     const { data: hist } = await supabase
       .from("question_history")
-      .select("question_id")
+      .select("question_id, created_at")
       .eq("user_id", user.id)
       .eq("category", category)
-      .eq("difficulty", lvl);
-    const attemptedIds = (hist ?? []).map((h: any) => h.question_id);
-    const qs = pickUnseenQuestions(category, lvl, attemptedIds, 5);
+      .eq("difficulty", lvl)
+      .order("created_at", { ascending: false });
+    const qs = pickUnseenQuestions(category, lvl, hist ?? [], 5);
     setLoadingQs(false);
     if (qs.length === 0) return;
     setLevel(lvl);

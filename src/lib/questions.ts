@@ -97,7 +97,7 @@ export type Question =
 // ============================================================
 // BANK — distinct content per category × level
 // ============================================================
-export const BANK: Question[] = [
+const BASE_BANK: Question[] = [
   // ============ MEMORY ============
   // EASY
   { id: "m-e-1", category: "Memory", level: "easy", type: "memory-objects",
@@ -458,34 +458,772 @@ export const BANK: Question[] = [
     explanation: "Alternates blue/orange and grows by one." },
 ];
 
+const shuffle = <T,>(items: T[]): T[] => {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+};
+
+const unique = <T,>(items: T[]): T[] => Array.from(new Set(items));
+
+function buildOptions(answer: string, distractors: string[]): { options: string[]; answer: number } {
+  return { options: unique([answer, ...distractors]).slice(0, 4), answer: 0 };
+}
+
+function rotate<T>(items: T[], offset: number): T[] {
+  return items.map((_, i) => items[(i + offset) % items.length]);
+}
+
+const MEMORY_OBJECT_THEMES: Record<Level, string[][]> = {
+  easy: [
+    ["🍎","🍌","🍇","🍉","🍒"],
+    ["🐶","🐱","🐰","🦊","🐼"],
+    ["🚗","🚲","🚌","🚂","✈️"],
+    ["⭐","🌙","☀️","☁️","🌈"],
+    ["⚽","🏀","🎾","🏈","🏐"],
+    ["📚","✏️","🖍️","📏","✂️"],
+  ],
+  medium: [
+    ["🍕","🥪","🌮","🍜","🍣","🍰"],
+    ["🦁","🐯","🐻","🐼","🦓","🦒"],
+    ["🚁","🚢","🚄","🚙","🛴","🚜"],
+    ["🟥","🟦","🟩","🟨","🟪","🟧"],
+    ["🎻","🥁","🎺","🎹","🎸","🪘"],
+    ["🔺","🔵","⭐","🟩","❤️","🔶"],
+  ],
+  hard: [
+    ["🧪","🔬","🧲","⚗️","🧬","📡","🛰️"],
+    ["♠","♥","♣","♦","★","✦","✿"],
+    ["α","β","γ","δ","ε","ζ","η"],
+    ["🦒","🐙","🦜","🐝","🦋","🐢","🦈"],
+    ["12","27","34","48","53","69","71"],
+    ["⚡","🔥","💧","🌪️","🌍","🌙","☄️"],
+  ],
+};
+
+const MEMORY_SEQUENCE_SPECS: Record<Level, { items: string[]; extras: string[] }[]> = {
+  easy: [
+    { items: ["3", "7", "1", "9"], extras: ["2", "5", "8"] },
+    { items: ["A", "D", "B", "C"], extras: ["E", "F", "G"] },
+    { items: ["🔴", "🟢", "🔵", "🟡"], extras: ["🟣", "🟠", "⚫"] },
+    { items: ["🐱", "🐶", "🐭", "🐹"], extras: ["🐰", "🦊", "🐻"] },
+  ],
+  medium: [
+    { items: ["8", "2", "5", "9", "1"], extras: ["3", "4", "6"] },
+    { items: ["K", "P", "T", "F", "R"], extras: ["L", "M", "S"] },
+    { items: ["🍎", "🍪", "🧃", "🍓", "🥪"], extras: ["🍇", "🍕", "🧁"] },
+    { items: ["🟥", "🟦", "🟨", "🟩", "🟪"], extras: ["🟧", "⬛", "⬜"] },
+  ],
+  hard: [
+    { items: ["7", "4", "9", "2", "6", "3", "8"], extras: ["1", "5", "0"] },
+    { items: ["Q", "L", "Z", "M", "R", "T", "B"], extras: ["C", "D", "X"] },
+    { items: ["♠", "♥", "♣", "♦", "★", "✦", "✿"], extras: ["☾", "☀️", "◆"] },
+    { items: ["12", "47", "85", "23", "61", "39", "74"], extras: ["16", "52", "91"] },
+  ],
+};
+
+const MEMORY_PAIR_SETS: Record<Level, string[][]> = {
+  easy: [
+    ["🍓", "🍌", "🍇"],
+    ["🐶", "🐱", "🐰"],
+    ["⚽", "🏀", "🎾"],
+    ["⭐", "🌙", "☀️"],
+  ],
+  medium: [
+    ["🐶", "🐱", "🐰", "🦊"],
+    ["🍕", "🍔", "🌮", "🍣"],
+    ["🔺", "🔵", "⭐", "❤️"],
+    ["🎸", "🎹", "🥁", "🎺"],
+  ],
+  hard: [
+    ["🌟", "🌙", "☀️", "⚡", "🔥", "💧"],
+    ["♠", "♥", "♣", "♦", "★", "✦"],
+    ["🧪", "🔬", "🧲", "⚗️", "🧬", "📡"],
+    ["🦒", "🐙", "🦜", "🐝", "🦋", "🐢"],
+  ],
+};
+
+const MEMORY_SHOW_COUNT: Record<Level, number> = { easy: 4, medium: 5, hard: 6 };
+const MEMORY_MEMORIZE_SEC: Record<Level, number> = { easy: 4, medium: 6, hard: 8 };
+const MEMORY_PAIR_MISMATCH: Record<Level, number> = { easy: 4, medium: 6, hard: 9 };
+
+function buildMemoryQuestions(level: Level): Question[] {
+  const questions: Question[] = [];
+  const showCount = MEMORY_SHOW_COUNT[level];
+
+  MEMORY_OBJECT_THEMES[level].forEach((theme, idx) => {
+    const memorize = theme.slice(0, showCount);
+    const hidden = theme[showCount];
+    const missPack = buildOptions(hidden, rotate(memorize, idx).slice(0, 3));
+    questions.push({
+      id: `gm-${level}-miss-${idx}`,
+      category: "Memory",
+      level,
+      type: "memory-objects",
+      memorize,
+      memorizeSec: MEMORY_MEMORIZE_SEC[level],
+      prompt: "Which item was NOT shown?",
+      explanation: `${hidden} was not in the memory set.`,
+      ...missPack,
+    });
+
+    const countAnswer = String(memorize.length);
+    const countPack = buildOptions(countAnswer, ["2", "3", "4", "5", "6", "7"].filter((n) => n !== countAnswer));
+    questions.push({
+      id: `gm-${level}-count-${idx}`,
+      category: "Memory",
+      level,
+      type: "memory-objects",
+      memorize,
+      memorizeSec: MEMORY_MEMORIZE_SEC[level],
+      prompt: "How many items did you see?",
+      explanation: `${memorize.length} items were shown.`,
+      ...countPack,
+    });
+
+    const shown = memorize[idx % memorize.length];
+    const shownPack = buildOptions(shown, unique([hidden, ...rotate(memorize.filter((item) => item !== shown), idx)]).slice(0, 3));
+    questions.push({
+      id: `gm-${level}-shown-${idx}`,
+      category: "Memory",
+      level,
+      type: "memory-objects",
+      memorize,
+      memorizeSec: MEMORY_MEMORIZE_SEC[level],
+      prompt: "Which item WAS shown?",
+      explanation: `${shown} was part of the memory set.`,
+      ...shownPack,
+    });
+  });
+
+  MEMORY_SEQUENCE_SPECS[level].forEach((spec, idx) => {
+    const firstPos = idx % spec.items.length;
+    const firstAnswer = spec.items[firstPos];
+    const firstPack = buildOptions(firstAnswer, unique([...spec.items.filter((_, i) => i !== firstPos), ...spec.extras]).slice(0, 3));
+    questions.push({
+      id: `gm-${level}-seq-${idx}`,
+      category: "Memory",
+      level,
+      type: "memory-sequence",
+      memorize: spec.items,
+      memorizeSec: MEMORY_MEMORIZE_SEC[level],
+      prompt: `What was in position ${firstPos + 1}?`,
+      explanation: `Position ${firstPos + 1} contained ${firstAnswer}.`,
+      ...firstPack,
+    });
+
+    const secondPos = spec.items.length - 1 - (idx % spec.items.length);
+    const secondAnswer = spec.items[secondPos];
+    const secondPack = buildOptions(secondAnswer, unique([...spec.items.filter((_, i) => i !== secondPos), ...spec.extras]).slice(0, 3));
+    questions.push({
+      id: `gm-${level}-pos-${idx}`,
+      category: "Memory",
+      level,
+      type: "memory-position",
+      memorize: spec.items,
+      memorizeSec: MEMORY_MEMORIZE_SEC[level],
+      prompt: secondPos === spec.items.length - 1 ? "Which item was LAST?" : `Which item was in spot ${secondPos + 1}?`,
+      explanation: `${secondAnswer} was in that position.`,
+      ...secondPack,
+    });
+  });
+
+  MEMORY_PAIR_SETS[level].forEach((pairs, idx) => {
+    questions.push({
+      id: `gm-${level}-pairs-${idx}`,
+      category: "Memory",
+      level,
+      type: "memory-pairs",
+      memorizeSec: Math.max(4, MEMORY_MEMORIZE_SEC[level] - 1),
+      pairs,
+      prompt: level === "easy" ? "Match all the hidden pairs." : level === "medium" ? "Clear the memory board without too many misses." : "Track every pair and finish the full memory board.",
+      maxMismatches: MEMORY_PAIR_MISMATCH[level],
+      options: ["done"],
+      answer: 0,
+      explanation: "Pair matching strengthens short-term visual memory.",
+    });
+  });
+
+  return questions;
+}
+
+const LOGIC_COMPARISON_GROUPS: Record<Level, string[][]> = {
+  easy: [
+    ["Tom", "Mia", "Leo", "Ava"],
+    ["Noah", "Lily", "Omar", "Zoe"],
+    ["Aria", "Ben", "Cole", "Dia"],
+    ["Ivy", "Jude", "Kai", "Nina"],
+    ["Ria", "Sean", "Tara", "Uma"],
+    ["Alex", "Bella", "Chris", "Dina"],
+    ["Eli", "Faye", "Gio", "Hana"],
+    ["Ivan", "Jia", "Kian", "Lena"],
+  ],
+  medium: [
+    ["Mason", "Priya", "Quinn", "Rosa"],
+    ["Soren", "Talia", "Uma", "Vik"],
+    ["Wren", "Xena", "Yuri", "Zara"],
+    ["Aiden", "Bianca", "Cyrus", "Delia"],
+    ["Eshan", "Farah", "Gavin", "Hazel"],
+    ["Ines", "Jon", "Keira", "Luca"],
+    ["Mina", "Niko", "Opal", "Pavel"],
+    ["Ruben", "Sara", "Theo", "Vera"],
+  ],
+  hard: [
+    ["Asha", "Bram", "Cleo", "Daren"],
+    ["Elin", "Faris", "Greta", "Hugo"],
+    ["Isla", "Joren", "Kira", "Lior"],
+    ["Marek", "Nyla", "Orin", "Petra"],
+    ["Rayan", "Sia", "Tobin", "Uri"],
+    ["Veda", "Walt", "Xavi", "Yana"],
+    ["Zane", "Anika", "Boris", "Celine"],
+    ["Damon", "Esme", "Felix", "Gaia"],
+  ],
+};
+
+const LOGIC_DIRECTION_SPECS: Record<Level, { name: string; start: string; turns: ("L" | "R" | "U")[] }[]> = {
+  easy: [
+    { name: "Lia", start: "North", turns: ["R"] },
+    { name: "Ben", start: "East", turns: ["L"] },
+    { name: "Maya", start: "North", turns: ["R", "U"] },
+    { name: "Rex", start: "South", turns: ["L", "L"] },
+    { name: "Ivy", start: "West", turns: ["R", "R"] },
+    { name: "Omar", start: "North", turns: ["L", "R"] },
+    { name: "Nia", start: "East", turns: ["U"] },
+    { name: "Kai", start: "South", turns: ["R"] },
+  ],
+  medium: [
+    { name: "Anya", start: "North", turns: ["R", "R", "L"] },
+    { name: "Deo", start: "West", turns: ["L", "U"] },
+    { name: "Faye", start: "South", turns: ["R", "L", "L"] },
+    { name: "Jai", start: "East", turns: ["R", "U", "L"] },
+    { name: "Kira", start: "North", turns: ["L", "L", "R"] },
+    { name: "Milo", start: "West", turns: ["R", "R", "U"] },
+    { name: "Pia", start: "South", turns: ["U", "L"] },
+    { name: "Tao", start: "East", turns: ["L", "L", "R"] },
+  ],
+  hard: [
+    { name: "Ari", start: "North", turns: ["R", "U", "L", "R"] },
+    { name: "Cleo", start: "West", turns: ["L", "R", "U", "L"] },
+    { name: "Eshan", start: "South", turns: ["R", "R", "L", "U"] },
+    { name: "Hana", start: "East", turns: ["U", "L", "R", "R"] },
+    { name: "Ilan", start: "North", turns: ["L", "U", "L", "R"] },
+    { name: "Mira", start: "West", turns: ["R", "L", "L", "U"] },
+    { name: "Niko", start: "South", turns: ["U", "R", "L", "L"] },
+    { name: "Zuri", start: "East", turns: ["L", "U", "R", "U"] },
+  ],
+};
+
+const LOGIC_ORDER_SETS: Record<Level, { prompt: string; correctOrder: string[] }[]> = {
+  easy: [
+    { prompt: "Arrange from SMALLEST to LARGEST:", correctOrder: ["🐜", "🐭", "🐱", "🐘"] },
+    { prompt: "Put the weekdays in order (start Monday):", correctOrder: ["Mon", "Tue", "Wed", "Thu", "Fri"] },
+    { prompt: "Arrange the numbers from lowest to highest:", correctOrder: ["2", "5", "7", "9"] },
+    { prompt: "Order the seasons from start of the year:", correctOrder: ["Spring", "Summer", "Autumn", "Winter"] },
+    { prompt: "Arrange from shortest to tallest:", correctOrder: ["pencil", "ruler", "umbrella", "ladder"] },
+    { prompt: "Order by number of sides:", correctOrder: ["Triangle", "Square", "Pentagon", "Hexagon"] },
+    { prompt: "Arrange from lightest to heaviest:", correctOrder: ["feather", "book", "chair", "car"] },
+    { prompt: "Order these ages from youngest to oldest:", correctOrder: ["6", "8", "10", "12"] },
+  ],
+  medium: [
+    { prompt: "Arrange the decimals from smallest to largest:", correctOrder: ["0.4", "0.9", "1.2", "1.8"] },
+    { prompt: "Order the planets from the Sun:", correctOrder: ["Mercury", "Venus", "Earth", "Mars"] },
+    { prompt: "Sort the fractions from smallest to largest:", correctOrder: ["1/4", "1/3", "1/2", "3/4"] },
+    { prompt: "Arrange from coldest to warmest:", correctOrder: ["-5°C", "0°C", "8°C", "14°C"] },
+    { prompt: "Order these times from earliest to latest:", correctOrder: ["7:15", "8:00", "8:45", "9:30"] },
+    { prompt: "Arrange the weights from lightest to heaviest:", correctOrder: ["450 g", "900 g", "1.5 kg", "2 kg"] },
+    { prompt: "Order the steps of plant growth:", correctOrder: ["seed", "sprout", "stem", "flower"] },
+    { prompt: "Arrange the values from smallest to largest:", correctOrder: ["15", "21", "28", "34"] },
+  ],
+  hard: [
+    { prompt: "Arrange from SMALLEST to LARGEST:", correctOrder: ["121", "144", "150", "169"] },
+    { prompt: "Order the fractions from smallest to largest:", correctOrder: ["3/8", "2/5", "5/12", "1/2"] },
+    { prompt: "Arrange the scientific values from smallest to largest:", correctOrder: ["3×10²", "9×10²", "1×10³", "2×10³"] },
+    { prompt: "Order the events of a chemical reaction:", correctOrder: ["Reactants meet", "Bonds break", "Products form", "Energy released"] },
+    { prompt: "Arrange the decimals from smallest to largest:", correctOrder: ["2.05", "2.5", "2.75", "3.1"] },
+    { prompt: "Sort the algebraic values for x=3 from lowest to highest:", correctOrder: ["x", "x+2", "2x", "3x"] },
+    { prompt: "Order the powers from smallest to largest:", correctOrder: ["2²", "2³", "3²", "2⁴"] },
+    { prompt: "Arrange the distances from shortest to longest:", correctOrder: ["0.8 km", "1.2 km", "1.8 km", "2.4 km"] },
+  ],
+};
+
+function directionAfter(start: string, turns: ("L" | "R" | "U")[]): string {
+  const dirs = ["North", "East", "South", "West"];
+  let idx = dirs.indexOf(start);
+  for (const turn of turns) {
+    if (turn === "R") idx = (idx + 1) % 4;
+    if (turn === "L") idx = (idx + 3) % 4;
+    if (turn === "U") idx = (idx + 2) % 4;
+  }
+  return dirs[idx];
+}
+
+function describeTurns(turns: ("L" | "R" | "U")[]): string {
+  return turns
+    .map((turn) => (turn === "R" ? "turns right" : turn === "L" ? "turns left" : "turns around"))
+    .join(", then ");
+}
+
+function buildLogicQuestions(level: Level): Question[] {
+  const questions: Question[] = [];
+
+  LOGIC_COMPARISON_GROUPS[level].forEach((group, idx) => {
+    const askTop = idx % 2 === 0;
+    const answerName = askTop ? group[0] : group[group.length - 1];
+    const pack = buildOptions(answerName, group.filter((name) => name !== answerName));
+    questions.push({
+      id: `gl-${level}-cmp-${idx}`,
+      category: "Logic",
+      level,
+      type: "mcq",
+      prompt: `${group.join(" > ")}. Who is ${askTop ? "greatest" : "smallest"}?`,
+      explanation: `${group.join(" > ")} means ${answerName} is ${askTop ? "at the top" : "at the bottom"} of the order.`,
+      ...pack,
+    });
+  });
+
+  LOGIC_DIRECTION_SPECS[level].forEach((spec, idx) => {
+    const answerDir = directionAfter(spec.start, spec.turns);
+    const pack = buildOptions(answerDir, ["North", "East", "South", "West"].filter((dir) => dir !== answerDir));
+    questions.push({
+      id: `gl-${level}-dir-${idx}`,
+      category: "Logic",
+      level,
+      type: "mcq",
+      prompt: `${spec.name} faces ${spec.start}, ${describeTurns(spec.turns)}. Which direction is ${spec.name} facing now?`,
+      explanation: `${spec.name} ends facing ${answerDir}.`,
+      ...pack,
+    });
+  });
+
+  LOGIC_ORDER_SETS[level].forEach((set, idx) => {
+    questions.push({
+      id: `gl-${level}-order-${idx}`,
+      category: "Logic",
+      level,
+      type: "logic-order",
+      prompt: set.prompt,
+      items: rotate(set.correctOrder, idx % set.correctOrder.length),
+      correctOrder: set.correctOrder,
+      options: ["correct"],
+      answer: 0,
+      explanation: `${set.correctOrder.join(" → ")} is the correct order.`,
+    });
+  });
+
+  return questions;
+}
+
+const PATTERN_TIME: Record<Level, number> = { easy: 20, medium: 25, hard: 30 };
+
+function buildPatternQuestions(level: Level): Question[] {
+  const questions: Question[] = [];
+  const numericStart = level === "easy" ? [2, 5, 10, 1, 7, 12, 3, 9] : level === "medium" ? [3, 6, 11, 14, 5, 9, 12, 18] : [5, 8, 13, 21, 34, 7, 15, 24];
+  const numericStep = level === "easy" ? [2, 3, 5, 4, 2, 3, 4, 5] : level === "medium" ? [3, 4, 5, 6, 7, 3, 4, 5] : [4, 6, 7, 8, 9, 5, 6, 7];
+
+  numericStart.forEach((start, idx) => {
+    const step = numericStep[idx];
+    const sequence = Array.from({ length: 4 }, (_, i) => String(start + i * step));
+    const answerVal = String(start + 4 * step);
+    const pack = buildOptions(answerVal, [String(start + 3 * step), String(start + 5 * step), String(start + 4 * step + (idx % 3) + 1)]);
+    questions.push({
+      id: `gp-${level}-next-${idx}`,
+      category: "Pattern",
+      level,
+      type: "pattern-next",
+      sequence: [...sequence, "?"],
+      prompt: idx % 2 === 0 ? "What comes next?" : "Find the next number in the pattern.",
+      explanation: `The pattern increases by ${step} each step.`,
+      timeSec: PATTERN_TIME[level],
+      ...pack,
+    });
+  });
+
+  numericStart.forEach((start, idx) => {
+    const step = numericStep[idx];
+    const full = Array.from({ length: 5 }, (_, i) => String(start + i * step));
+    const missIndex = 1 + (idx % 3);
+    const answerVal = full[missIndex];
+    const pack = buildOptions(answerVal, [String(Number(answerVal) - step), String(Number(answerVal) + step), String(Number(answerVal) + step + 1)]);
+    questions.push({
+      id: `gp-${level}-missing-${idx}`,
+      category: "Pattern",
+      level,
+      type: "pattern-missing",
+      sequence: full.map((item, i) => (i == missIndex ? "?" : item)),
+      prompt: "Which value is missing?",
+      explanation: `Keep adding ${step} to continue the pattern.`,
+      timeSec: PATTERN_TIME[level],
+      ...pack,
+    });
+  });
+
+  const checkerPairs = level === "easy"
+    ? [["🔴", "🔵"], ["⭐", "🌙"], ["🟩", "🟨"]]
+    : level === "medium"
+      ? [["🟦", "🟧"], ["🔺", "🔻"], ["⬛", "⬜"]]
+      : [["◆", "◇"], ["▲", "▼"], ["♠", "♣"]];
+
+  checkerPairs.forEach(([a, b], idx) => {
+    const answerVal = idx % 2 === 0 ? b : a;
+    const grid = [a, b, a, b, a, b, a, "?", a];
+    const pack = buildOptions(answerVal, unique([a, b, "★", "○"]).filter((item) => item !== answerVal).slice(0, 3));
+    questions.push({
+      id: `gp-${level}-grid-check-${idx}`,
+      category: "Pattern",
+      level,
+      type: "pattern-grid",
+      grid,
+      prompt: "Which symbol completes the checkerboard?",
+      explanation: "The pattern alternates every cell.",
+      timeSec: PATTERN_TIME[level] + 3,
+      ...pack,
+    });
+  });
+
+  const mathTriples = level === "easy"
+    ? [[1, 2, 3], [2, 3, 5], [3, 1, 4]]
+    : level === "medium"
+      ? [[2, 4, 6], [3, 5, 8], [4, 6, 10]]
+      : [[2, 3, 6], [3, 4, 12], [4, 5, 20]];
+
+  mathTriples.forEach((triple, idx) => {
+    const [a, b, c] = triple;
+    const answerVal = level === "hard" ? String(a * b) : String(a + b);
+    const last = level === "hard" ? String((a + 1) * (b + 1)) : String((a + 1) + (b + 1));
+    const grid = level === "hard"
+      ? [String(a), String(b), String(a * b), String(a + 1), String(b + 1), last, String(a + 2), String(b + 2), "?"]
+      : [String(a), String(b), String(a + b), String(b), String(c), String(b + c), String(c), String(c + 1), "?"];
+    const answer = level === "hard" ? String((a + 2) * (b + 2)) : String(c + (c + 1));
+    const pack = buildOptions(answer, [String(Number(answer) - 1), String(Number(answer) + 1), String(Number(answer) + 2)]);
+    questions.push({
+      id: `gp-${level}-grid-math-${idx}`,
+      category: "Pattern",
+      level,
+      type: "pattern-grid",
+      grid,
+      prompt: level === "hard" ? "Find the missing result in the multiplication grid:" : "Find the missing total in the number grid:",
+      explanation: level === "hard" ? "Each row multiplies the first two values." : "The third cell in each row is the sum of the first two.",
+      timeSec: PATTERN_TIME[level] + 5,
+      ...pack,
+    });
+  });
+
+  return questions;
+}
+
+const PROBLEM_TIMELESS_OPTIONS = (correct: number, deltas: number[]) => buildOptions(String(correct), deltas.map((delta) => String(correct + delta)));
+
+function buildProblemQuestions(level: Level): Question[] {
+  const questions: Question[] = [];
+
+  if (level === "easy") {
+    const sharing = [[6, 3], [8, 4], [10, 5], [12, 4]];
+    sharing.forEach(([total, people], idx) => {
+      const answer = total / people;
+      questions.push({
+        id: `gpr-${level}-share-${idx}`,
+        category: "Problem",
+        level,
+        type: "problem-scenario",
+        emoji: "🍬",
+        scenario: `There are ${total} candies shared equally among ${people} children.`,
+        prompt: "How many candies does each child get?",
+        explanation: `${total} ÷ ${people} = ${answer}.`,
+        ...PROBLEM_TIMELESS_OPTIONS(answer, [-1, 1, 2]),
+      });
+    });
+
+    const reading = [[5, 7], [6, 5], [4, 8], [7, 6]];
+    reading.forEach(([perDay, days], idx) => {
+      const answer = perDay * days;
+      questions.push({
+        id: `gpr-${level}-read-${idx}`,
+        category: "Problem",
+        level,
+        type: "problem-scenario",
+        emoji: "📚",
+        scenario: `A student reads ${perDay} pages each day for ${days} days.`,
+        prompt: "How many pages are read in total?",
+        explanation: `${perDay} × ${days} = ${answer}.`,
+        ...PROBLEM_TIMELESS_OPTIONS(answer, [-perDay, perDay, days]),
+      });
+    });
+
+    const coinSets = [[4, 3, 2, 1], [5, 2, 2, 1], [3, 4, 3, 1], [6, 1, 2, 1]];
+    coinSets.forEach(([aCount, bCount, aValue, bValue], idx) => {
+      const answer = aCount * aValue + bCount * bValue;
+      questions.push({
+        id: `gpr-${level}-coins-${idx}`,
+        category: "Problem",
+        level,
+        type: "problem-scenario",
+        emoji: "🪙",
+        scenario: `A piggy bank has ${aCount} coins of $${aValue} and ${bCount} coins of $${bValue}.`,
+        prompt: "How much money is inside?",
+        explanation: `${aCount}×${aValue} + ${bCount}×${bValue} = ${answer}.`,
+        options: [`$${answer}`, `$${answer + 1}`, `$${answer + 2}`, `$${Math.max(1, answer - 1)}`],
+        answer: 0,
+      });
+    });
+
+    const expressions = [
+      [5, 3, 2], [7, 2, 3], [9, 4, 2], [6, 5, 2], [8, 2, 4], [10, 3, 2],
+      [4, 6, 2], [3, 7, 2], [12, 2, 3], [11, 4, 2], [14, 3, 2], [9, 5, 2],
+    ];
+    expressions.forEach(([a, b, c], idx) => {
+      const answer = a + b * c;
+      questions.push({
+        id: `gpr-${level}-expr-${idx}`,
+        category: "Problem",
+        level,
+        type: "mcq",
+        prompt: `${a} + ${b} × ${c} = ?`,
+        explanation: `Multiply first: ${b}×${c} = ${b * c}, then add ${a}.`,
+        ...PROBLEM_TIMELESS_OPTIONS(answer, [-2, 2, c]),
+      });
+    });
+  }
+
+  if (level === "medium") {
+    const rates = [[60, 45], [72, 60], [90, 75], [48, 30]];
+    rates.forEach(([distance, minutes], idx) => {
+      const answer = Math.round(distance / (minutes / 60));
+      questions.push({
+        id: `gpr-${level}-rate-${idx}`,
+        category: "Problem",
+        level,
+        type: "problem-scenario",
+        emoji: "🚆",
+        scenario: `A train travels ${distance} km in ${minutes} minutes at a constant speed.`,
+        prompt: "What is the speed in km/h?",
+        explanation: `${distance} ÷ ${minutes / 60} = ${answer} km/h.`,
+        ...PROBLEM_TIMELESS_OPTIONS(answer, [-10, 10, 15]),
+      });
+    });
+
+    const stickerSets = [[24, 3, 5], [30, 5, 4], [36, 4, 6], [27, 3, 8]];
+    stickerSets.forEach(([total, divisor, add], idx) => {
+      const answer = total - total / divisor + add;
+      questions.push({
+        id: `gpr-${level}-stickers-${idx}`,
+        category: "Problem",
+        level,
+        type: "problem-scenario",
+        emoji: "🌟",
+        scenario: `A student has ${total} stickers, gives 1/${divisor} away, then buys ${add} more.`,
+        prompt: "How many stickers are left now?",
+        explanation: `${total} - ${total / divisor} + ${add} = ${answer}.`,
+        ...PROBLEM_TIMELESS_OPTIONS(answer, [-3, 3, divisor]),
+      });
+    });
+
+    const fills = [[3000, 200], [2400, 150], [3600, 300], [2800, 175]];
+    fills.forEach(([total, rate], idx) => {
+      const answer = total / rate;
+      questions.push({
+        id: `gpr-${level}-fill-${idx}`,
+        category: "Problem",
+        level,
+        type: "problem-scenario",
+        emoji: "🏊",
+        scenario: `A tank holds ${total} L and fills at ${rate} L each minute.`,
+        prompt: "How many minutes until it is full?",
+        explanation: `${total} ÷ ${rate} = ${answer}.`,
+        ...PROBLEM_TIMELESS_OPTIONS(answer, [-2, 2, 5]),
+      });
+    });
+
+    const equations = [
+      [8, 4, 2, 3], [10, 6, 4, 2], [12, 3, 5, 2], [14, 8, 2, 3], [9, 7, 3, 2], [16, 4, 6, 2],
+      [18, 6, 3, 2], [20, 5, 4, 3], [11, 9, 2, 2], [15, 3, 7, 2], [13, 5, 2, 4], [17, 7, 3, 2],
+    ];
+    equations.forEach(([a, b, c, d], idx) => {
+      const answer = (a + b) / d + c;
+      questions.push({
+        id: `gpr-${level}-expr-${idx}`,
+        category: "Problem",
+        level,
+        type: "mcq",
+        prompt: `(${a} + ${b}) ÷ ${d} + ${c} = ?`,
+        explanation: `Add first, divide, then add ${c}.`,
+        ...PROBLEM_TIMELESS_OPTIONS(answer, [-2, 2, d]),
+      });
+    });
+  }
+
+  if (level === "hard") {
+    const discounts = [[80, 20], [120, 25], [150, 40], [96, 20]];
+    discounts.forEach(([sale, pct], idx) => {
+      const answer = Math.round(sale / (1 - pct / 100));
+      questions.push({
+        id: `gpr-${level}-discount-${idx}`,
+        category: "Problem",
+        level,
+        type: "problem-scenario",
+        emoji: "👕",
+        scenario: `An item sells for $${sale} after a ${pct}% discount.`,
+        prompt: "What was the original price?",
+        explanation: `${sale} ÷ ${1 - pct / 100} = ${answer}.`,
+        options: [`$${answer}`, `$${answer + 10}`, `$${Math.max(1, answer - 10)}`, `$${answer + 20}`],
+        answer: 0,
+      });
+    });
+
+    const closing = [[300, 50, 70], [240, 40, 80], [360, 60, 60], [420, 70, 50]];
+    closing.forEach(([distance, a, b], idx) => {
+      const answer = Number((distance / (a + b)).toFixed(1));
+      questions.push({
+        id: `gpr-${level}-closing-${idx}`,
+        category: "Problem",
+        level,
+        type: "problem-scenario",
+        emoji: "🚗",
+        scenario: `Two cars start ${distance} km apart and drive toward each other at ${a} and ${b} km/h.`,
+        prompt: "After how many hours do they meet?",
+        explanation: `${distance} ÷ (${a}+${b}) = ${answer} hours.`,
+        ...buildOptions(String(answer), [String((answer + 0.5).toFixed(1)), String((answer + 1).toFixed(1)), String(Math.max(0.5, answer - 0.5).toFixed(1))]),
+      });
+    });
+
+    const overtime = [[15, 40, 6], [18, 38, 5], [20, 42, 4], [16, 40, 8]];
+    overtime.forEach(([rate, normal, extra], idx) => {
+      const answer = rate * normal + rate * 1.5 * extra;
+      questions.push({
+        id: `gpr-${level}-pay-${idx}`,
+        category: "Problem",
+        level,
+        type: "problem-scenario",
+        emoji: "💼",
+        scenario: `A worker earns $${rate}/h normally and 1.5× for overtime. She works ${normal} normal hours and ${extra} overtime hours.`,
+        prompt: "What is the total weekly pay?",
+        explanation: `${normal}×${rate} + ${extra}×${rate * 1.5} = $${answer}.`,
+        options: [`$${answer}`, `$${answer + 30}`, `$${answer + 45}`, `$${answer - 30}`],
+        answer: 0,
+      });
+    });
+
+    const equations = [
+      [2, 7, 3, 5], [3, 4, 5, 10], [4, 9, 6, 15], [5, 6, 7, 14], [6, 8, 9, 17], [7, 5, 8, 12],
+      [8, 3, 10, 15], [9, 12, 11, 18], [4, 11, 5, 16], [3, 9, 4, 13], [2, 5, 4, 11], [6, 7, 8, 19],
+    ];
+    equations.forEach(([a, b, c, d], idx) => {
+      const answer = d + b;
+      questions.push({
+        id: `gpr-${level}-alg-${idx}`,
+        category: "Problem",
+        level,
+        type: "mcq",
+        prompt: `Solve: ${a}x + ${b} = ${a + 1}x - ${d}`,
+        explanation: `Move ${a}x to the right and ${d} to the left, giving x = ${answer}.`,
+        ...PROBLEM_TIMELESS_OPTIONS(answer, [-2, 2, c]),
+      });
+    });
+  }
+
+  return questions;
+}
+
+const GENERATED_BANK: Question[] = [
+  ...(["easy", "medium", "hard"] as Level[]).flatMap((level) => buildMemoryQuestions(level)),
+  ...(["easy", "medium", "hard"] as Level[]).flatMap((level) => buildLogicQuestions(level)),
+  ...(["easy", "medium", "hard"] as Level[]).flatMap((level) => buildPatternQuestions(level)),
+  ...(["easy", "medium", "hard"] as Level[]).flatMap((level) => buildProblemQuestions(level)),
+];
+
+export const BANK: Question[] = [...BASE_BANK, ...GENERATED_BANK];
+
+function randomizeQuestion(question: Question): Question {
+  if (question.type === "logic-order" || question.type === "memory-pairs") {
+    return { ...question };
+  }
+
+  if (!("options" in question) || question.options.length <= 1) {
+    return { ...question };
+  }
+
+  const mixed = shuffle(question.options.map((option, index) => ({ option, correct: index === question.answer })));
+  return {
+    ...question,
+    options: mixed.map((item) => item.option),
+    answer: mixed.findIndex((item) => item.correct),
+  } as Question;
+}
+
+export type QuestionHistoryEntry = {
+  question_id: string;
+  created_at?: string | null;
+};
+
 export function pickQuestions(category: Category, level: Level, count = 5): Question[] {
-  const pool = BANK.filter(q => q.category === category && q.level === level);
-  return [...pool].sort(() => Math.random() - 0.5).slice(0, Math.min(count, pool.length));
+  const pool = BANK.filter((q) => q.category === category && q.level === level);
+  return shuffle(pool).slice(0, Math.min(count, pool.length)).map(randomizeQuestion);
 }
 
 /**
  * Smart non-repeating picker.
- * - Filters out questions the user already saw (by id).
- * - If the unseen pool is too small, top up with the LEAST-recently-seen ones.
- * - Always shuffles, so two users (and two retakes) get different orderings.
+ * - Prioritizes unseen questions first.
+ * - Avoids recently seen questions whenever possible.
+ * - Falls back to the least-played / least-recent questions only when needed.
+ * - Randomizes option order on every test start.
  */
 export function pickUnseenQuestions(
   category: Category,
   level: Level,
-  attemptedIds: string[],
+  history: QuestionHistoryEntry[],
   count = 5,
 ): Question[] {
-  const pool = BANK.filter(q => q.category === category && q.level === level);
-  const seen = new Set(attemptedIds);
-  const unseen = pool.filter(q => !seen.has(q.id));
-  const seenAgain = pool.filter(q => seen.has(q.id));
-  const shuffle = <T,>(a: T[]) => [...a].sort(() => Math.random() - 0.5);
+  const pool = BANK.filter((q) => q.category === category && q.level === level);
+  const orderedHistory = [...history].sort(
+    (a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime(),
+  );
 
-  const picked = shuffle(unseen).slice(0, count);
-  if (picked.length < count) {
-    picked.push(...shuffle(seenAgain).slice(0, count - picked.length));
-  }
-  return picked;
+  const recentIds = unique(orderedHistory.map((entry) => entry.question_id)).slice(0, 10);
+  const recentSet = new Set(recentIds);
+
+  const stats = new Map<string, { count: number; lastSeen: number }>();
+  orderedHistory.forEach((entry) => {
+    const lastSeen = new Date(entry.created_at ?? 0).getTime();
+    const current = stats.get(entry.question_id);
+    if (!current) {
+      stats.set(entry.question_id, { count: 1, lastSeen });
+      return;
+    }
+    stats.set(entry.question_id, {
+      count: current.count + 1,
+      lastSeen: Math.max(current.lastSeen, lastSeen),
+    });
+  });
+
+  const unseen = pool.filter((question) => !stats.has(question.id));
+  const seenNotRecent = pool
+    .filter((question) => stats.has(question.id) && !recentSet.has(question.id))
+    .sort((a, b) => {
+      const sa = stats.get(a.id)!;
+      const sb = stats.get(b.id)!;
+      if (sa.count !== sb.count) return sa.count - sb.count;
+      return sa.lastSeen - sb.lastSeen;
+    });
+  const recent = pool
+    .filter((question) => recentSet.has(question.id))
+    .sort((a, b) => (stats.get(a.id)?.lastSeen ?? 0) - (stats.get(b.id)?.lastSeen ?? 0));
+
+  const picked: Question[] = [];
+  const appendUnique = (items: Question[]) => {
+    for (const item of items) {
+      if (picked.some((existing) => existing.id === item.id)) continue;
+      picked.push(item);
+      if (picked.length === count) break;
+    }
+  };
+
+  appendUnique(shuffle(unseen));
+  if (picked.length < count) appendUnique(shuffle(seenNotRecent));
+  if (picked.length < count) appendUnique(shuffle(recent));
+
+  return shuffle(picked).slice(0, count).map(randomizeQuestion);
 }
 
 export function suggestLevelForGrade(grade: number): Level {
