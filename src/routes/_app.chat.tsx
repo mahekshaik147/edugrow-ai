@@ -87,15 +87,18 @@ function Chat() {
         await supabase.from("chat_messages").insert({ user_id: user.id, role: "user", content: text });
       }
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-tutor`;
+      const token = session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const resp = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ messages: next, grade: profile?.grade ?? 5 }),
       });
       if (!resp.ok || !resp.body) {
-        if (resp.status === 429) toast.error("Slow down a bit — too many messages! Try again in a moment.");
+        let msg = "Couldn't reach AI tutor.";
+        try { const j = await resp.json(); if (j?.error) msg = j.error; } catch { /* ignore */ }
+        if (resp.status === 429) toast.error(msg || "Slow down a bit — too many messages!");
         else if (resp.status === 402) toast.error("AI credits exhausted. Add funds in Workspace settings.");
-        else toast.error("Couldn't reach AI tutor.");
+        else toast.error(msg);
         setMessages(m => m.slice(0, -1));
         return;
       }
