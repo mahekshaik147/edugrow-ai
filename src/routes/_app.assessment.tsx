@@ -298,6 +298,11 @@ function Assessment() {
           </div>
         </motion.div>
 
+        {/* Friendly disclaimer */}
+        <div className="glass rounded-2xl px-4 py-3 text-center text-xs text-muted-foreground">
+          🌈 SmartMind scores are a fun way to track thinking skills like memory, logic and patterns — they're not a clinical or official IQ test.
+        </div>
+
         {/* KPI tiles */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <KpiTile icon={<Target className="h-4 w-4" />} label="Accuracy" value={`${pct}%`} />
