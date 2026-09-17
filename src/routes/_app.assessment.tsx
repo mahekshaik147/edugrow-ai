@@ -15,21 +15,21 @@ import { Progress } from "@/components/ui/progress";
 import { Brain, Puzzle, Lightbulb, Layers, Sparkles, Check, X, Eye, EyeOff, BookOpen, Clock, Target, TrendingUp, Lightbulb as Bulb } from "lucide-react";
 
 export const Route = createFileRoute("/_app/assessment")({
-  head: () => ({ meta: [{ title: "IQ Zone — SmartMind AI" }] }),
+  head: () => ({ meta: [{ title: "Brain Skills Zone — SmartMind AI" }] }),
   component: Assessment,
 });
 
 const CATEGORIES: { key: Category; label: string; tag: string; icon: React.ReactNode; gradient: string; emoji: string; modes: string[] }[] = [
-  { key: "Memory",  label: "Memory IQ",  tag: "Brain memory training",   icon: <Brain />,    gradient: "gradient-hero",   emoji: "🧠", modes: ["Sequence recall", "Hidden objects", "Card matching"] },
-  { key: "Logic",   label: "Logic IQ",   tag: "IQ reasoning",            icon: <Lightbulb />,gradient: "gradient-mint",   emoji: "💡", modes: ["Odd-one-out", "Deductive reasoning", "Logical ordering"] },
-  { key: "Pattern", label: "Pattern IQ", tag: "Visual IQ puzzles",       icon: <Layers />,   gradient: "gradient-sunset", emoji: "🔁", modes: ["Find next", "Missing piece", "3×3 grids"] },
-  { key: "Problem", label: "Problem IQ", tag: "Real-life thinking",      icon: <Puzzle />,   gradient: "gradient-coin",   emoji: "🧩", modes: ["Story puzzles", "Math reasoning", "Decisions"] },
+  { key: "Memory",  label: "Memory Skills",  tag: "Brain memory training",   icon: <Brain />,    gradient: "gradient-hero",   emoji: "🧠", modes: ["Sequence recall", "Hidden objects", "Card matching"] },
+  { key: "Logic",   label: "Logic Skills",   tag: "Reasoning challenges",            icon: <Lightbulb />,gradient: "gradient-mint",   emoji: "💡", modes: ["Odd-one-out", "Deductive reasoning", "Logical ordering"] },
+  { key: "Pattern", label: "Pattern Skills", tag: "Visual puzzles",       icon: <Layers />,   gradient: "gradient-sunset", emoji: "🔁", modes: ["Find next", "Missing piece", "3×3 grids"] },
+  { key: "Problem", label: "Problem Skills", tag: "Real-life thinking",      icon: <Puzzle />,   gradient: "gradient-coin",   emoji: "🧩", modes: ["Story puzzles", "Math reasoning", "Decisions"] },
 ];
 
 const LEVELS: { key: Level; title: string; sub: string; emoji: string; grades: string; gradient: string }[] = [
   { key: "easy",   title: "Easy",   sub: "Beginner-friendly warm-up",  emoji: "🌱", grades: "Grades 1–4",  gradient: "gradient-mint" },
   { key: "medium", title: "Medium", sub: "Sharper thinking",            emoji: "⚡", grades: "Grades 5–7",  gradient: "gradient-sunset" },
-  { key: "hard",   title: "Hard",   sub: "Real IQ challenge mode",      emoji: "🔥", grades: "Grades 8–10", gradient: "gradient-hero" },
+  { key: "hard",   title: "Hard",   sub: "Real challenge mode",      emoji: "🔥", grades: "Grades 8–10", gradient: "gradient-hero" },
 ];
 
 type Phase = "category" | "level" | "memorize" | "play" | "result";
@@ -161,7 +161,7 @@ function Assessment() {
         if (pct === 100) {
           await supabase.from("achievements").upsert({
             user_id: user.id, badge_key: `perfect_${category.toLowerCase()}`,
-            title: `${category} IQ Champion`, description: `Perfect score on ${category} IQ!`,
+            title: `${category} Skills Champion`, description: `Perfect score on ${category} Skills!`,
           }, { onConflict: "user_id,badge_key" });
         }
         refresh();
@@ -182,8 +182,11 @@ function Assessment() {
   if (phase === "category") {
     return (
       <div className="mx-auto max-w-5xl px-4 py-10">
-        <h1 className="font-display text-4xl font-bold text-center">IQ Zone 🧠</h1>
+        <h1 className="font-display text-4xl font-bold text-center">Brain Skills Zone 🧠</h1>
         <p className="text-center text-muted-foreground mt-2">Each category is a totally different brain-training mode</p>
+        <p className="text-center text-xs text-muted-foreground mt-2 max-w-xl mx-auto">
+          🌈 A fun way to grow memory, logic and pattern skills — not a clinical or official IQ test.
+        </p>
         <div className="mt-10 grid sm:grid-cols-2 gap-5">
           {CATEGORIES.map((c, i) => (
             <motion.button key={c.key}
@@ -212,9 +215,9 @@ function Assessment() {
     return (
       <div className="mx-auto max-w-5xl px-4 py-10">
         <button onClick={() => setPhase("category")} className="text-sm font-bold text-muted-foreground hover:text-primary">← Back</button>
-        <h1 className="font-display text-4xl font-bold text-center mt-2">Choose your IQ level</h1>
+        <h1 className="font-display text-4xl font-bold text-center mt-2">Choose your challenge level</h1>
         <p className="text-center text-muted-foreground mt-2">
-          <b className="text-primary">{category} IQ</b> · suggested for you:{" "}
+          <b className="text-primary">{category} Skills</b> · suggested for you:{" "}
           <span className="capitalize font-bold">{suggestLevelForGrade(grade)}</span>
         </p>
         <div className="mt-10 grid md:grid-cols-3 gap-5">
@@ -246,7 +249,7 @@ function Assessment() {
     return (
       <div className="mx-auto max-w-3xl px-4 py-10">
         <div className="text-center text-sm font-bold text-muted-foreground uppercase tracking-wider">
-          {category} IQ · Question {idx + 1} of {questions.length}
+          {category} Skills · Question {idx + 1} of {questions.length}
         </div>
         <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
           className="mt-6 glass-strong rounded-3xl p-8 text-center">
@@ -283,12 +286,12 @@ function Assessment() {
           className="glass-strong rounded-3xl p-8 text-center">
           <div className="text-6xl">{pct === 100 ? "🏆" : pct >= 80 ? "🌟" : pct >= 50 ? "👏" : "💪"}</div>
           <h2 className="mt-3 font-display text-3xl sm:text-4xl font-bold">
-            {pct === 100 ? "Perfect IQ!" : pct >= 80 ? "Brilliant!" : pct >= 50 ? "Nice work!" : "Keep training!"}
+            {pct === 100 ? "Perfect score!" : pct >= 80 ? "Brilliant!" : pct >= 50 ? "Nice work!" : "Keep training!"}
           </h2>
-          <div className="mt-1 text-sm text-muted-foreground">{category} IQ · <span className="capitalize">{level}</span></div>
+          <div className="mt-1 text-sm text-muted-foreground">{category} Skills · <span className="capitalize">{level}</span></div>
           <div className="mt-3 font-display text-6xl font-bold text-gradient">{pct}%</div>
           <div className="mt-2 inline-flex px-3 py-1 rounded-full bg-primary/15 text-primary text-xs font-bold uppercase tracking-wider">
-            IQ band · {a.iqBand}
+            Brain Skills Level · {a.iqBand}
           </div>
           <div className="mt-5 flex justify-center gap-2 text-sm">
             <span className="px-4 py-1.5 rounded-full bg-primary/15 text-primary font-bold">
@@ -297,6 +300,11 @@ function Assessment() {
             <span className="px-4 py-1.5 rounded-full bg-fun/40 text-fun-foreground font-bold">+{a.correct * 2} coins</span>
           </div>
         </motion.div>
+
+        {/* Friendly disclaimer */}
+        <div className="glass rounded-2xl px-4 py-3 text-center text-xs text-muted-foreground">
+          🌈 SmartMind scores are a fun way to track thinking skills like memory, logic and patterns — they're not a clinical or official IQ test.
+        </div>
 
         {/* KPI tiles */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -375,7 +383,7 @@ function Assessment() {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Button onClick={() => setPhase("category")} className="rounded-full font-bold h-12 px-6">Try another IQ test 🎯</Button>
+          <Button onClick={() => setPhase("category")} className="rounded-full font-bold h-12 px-6">Try another skills test 🎯</Button>
           <Link to="/progress"><Button variant="outline" className="rounded-full font-bold h-12 px-6 w-full">View full progress 📈</Button></Link>
           <Link to="/dashboard"><Button variant="ghost" className="rounded-full font-bold h-12 px-6 w-full">Home</Button></Link>
         </div>
@@ -407,7 +415,7 @@ function Assessment() {
           initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}
           className="glass-strong rounded-3xl p-7 md:p-10">
           <div className="text-xs uppercase font-bold text-muted-foreground tracking-wider">
-            {category} IQ · {level}
+            {category} Skills · {level}
           </div>
 
           {/* MEMORY non-pair: hidden badge */}
@@ -524,7 +532,7 @@ function Assessment() {
           {showFeedback && (
             <div className="mt-6 flex justify-end">
               <Button onClick={next} className="rounded-full font-bold h-12 px-7">
-                {idx + 1 < questions.length ? "Next →" : "See IQ score 🎉"}
+                {idx + 1 < questions.length ? "Next →" : "See your score 🎉"}
               </Button>
             </div>
           )}
