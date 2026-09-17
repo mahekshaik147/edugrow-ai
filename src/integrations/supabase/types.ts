@@ -101,6 +101,36 @@ export type Database = {
         }
         Relationships: []
       }
+      moderation_log: {
+        Row: {
+          category: string | null
+          created_at: string
+          direction: string
+          flagged: boolean
+          id: string
+          original_snippet: string | null
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          direction: string
+          flagged?: boolean
+          id?: string
+          original_snippet?: string | null
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          direction?: string
+          flagged?: boolean
+          id?: string
+          original_snippet?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_emoji: string
