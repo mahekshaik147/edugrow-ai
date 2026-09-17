@@ -26,7 +26,7 @@ function stripScores(content: string): { clean: string; scores: { grammar?: numb
 }
 
 function Chat() {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const { profile } = useProfile();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
