@@ -111,7 +111,7 @@ export function generateStudyPlan(stats: CategoryStat[]): PlanDay[] {
       emoji: emoji[focus],
       minutes,
       tasks: [
-        `${minutes} min of ${focus} IQ (${level})`,
+        `${minutes} min of ${focus} skills (${level})`,
         `1 ${focus.toLowerCase()} puzzle in the AI Tutor`,
         TIPS[focus][i % TIPS[focus].length],
       ],

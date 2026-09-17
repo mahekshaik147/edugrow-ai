@@ -70,7 +70,7 @@ function ProgressPage() {
       <h1 className="font-display text-4xl font-bold">Your progress 📈</h1>
 
       <div className="grid sm:grid-cols-3 gap-4">
-        <KPI label="IQ tests taken" value={total} emoji="🧠" />
+        <KPI label="Skills tests taken" value={total} emoji="🧠" />
         <KPI label="Average accuracy" value={`${accuracy}%`} emoji="🎯" />
         <KPI label="Total XP" value={totalXP} emoji="✨" />
       </div>
@@ -117,7 +117,7 @@ function ProgressPage() {
                 <YAxis />
                 <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid var(--border)" }} />
                 <Bar dataKey="avg" fill="var(--primary)" radius={[12, 12, 0, 0]} name="Avg %" />
-                <Bar dataKey="games" fill="var(--accent)" radius={[12, 12, 0, 0]} name="IQ tests" />
+                <Bar dataKey="games" fill="var(--accent)" radius={[12, 12, 0, 0]} name="Skills tests" />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -131,7 +131,7 @@ function ProgressPage() {
                 <span className="font-bold">{s.category}</span>
                 <span className="font-bold text-success-foreground">{s.score}%</span>
               </div>
-            )) : <div className="mt-2 text-sm text-muted-foreground">Take some IQ tests to see your strengths!</div>}
+            )) : <div className="mt-2 text-sm text-muted-foreground">Take some skills tests to see your strengths!</div>}
           </div>
           <div>
             <div className="text-xs uppercase font-bold text-muted-foreground">Areas to grow 🌱</div>
@@ -170,7 +170,7 @@ function WeaknessPanel({ results }: { results: any[] }) {
       </div>
 
       {results.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Take a few IQ tests and your AI coach will analyze your strengths and weaknesses here.</p>
+        <p className="text-sm text-muted-foreground">Take a few skills tests and your AI coach will analyze your strengths and weaknesses here.</p>
       ) : (
         <div className="grid md:grid-cols-2 gap-4">
           <div>
@@ -184,7 +184,7 @@ function WeaknessPanel({ results }: { results: any[] }) {
                 {weak.map(w => (
                   <div key={w.category} className="rounded-2xl border border-warning/40 bg-warning/10 p-4">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold">{w.category} IQ</span>
+                      <span className="font-bold">{w.category} Skills</span>
                       <span className="text-sm font-bold">{w.accuracy}% accuracy</span>
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground">{w.attempts} tests · avg {w.avgTimePerQ}s per question</div>
@@ -209,7 +209,7 @@ function WeaknessPanel({ results }: { results: any[] }) {
                 {strong.map(s => (
                   <div key={s.category} className="rounded-2xl border border-success/40 bg-success/10 p-4">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold">{s.category} IQ</span>
+                      <span className="font-bold">{s.category} Skills</span>
                       <span className="text-sm font-bold">{s.accuracy}% accuracy</span>
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground">{s.attempts} tests · last score {s.lastScore}%</div>
@@ -241,7 +241,7 @@ function StudyPlanPanel({ results }: { results: any[] }) {
           <div key={day.day} className="rounded-2xl bg-card border border-border p-3 flex flex-col">
             <div className="text-xs uppercase font-bold tracking-wider text-muted-foreground">{day.day}</div>
             <div className="text-2xl mt-1">{day.emoji}</div>
-            <div className="font-bold text-sm">{day.focus} IQ</div>
+            <div className="font-bold text-sm">{day.focus} Skills</div>
             <div className="text-[11px] text-muted-foreground">{day.minutes} min focus</div>
             <ul className="mt-2 text-[11px] space-y-1 flex-1">
               {day.tasks.map((t, i) => (
